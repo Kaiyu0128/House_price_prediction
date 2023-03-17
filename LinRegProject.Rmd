@@ -1,25 +1,31 @@
 ---
 title: "project X"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 date: "2023-02-28"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-data <- read.csv('~/Desktop/math_448/Project/data.csv')
+data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
 print(paste("Number of records: ", nrow(data)))
 print(paste("Number of features: ", ncol(data)))
 head(data)
 
 ```
 
+####summary and visualization
 
 ```{r}
 summary(data)
 colnames(data)
 str(data)
 ```
-####Adjusting dataset
+
+
+
+
 
 #checking variables
 ```{r}
@@ -35,14 +41,11 @@ we are going to drop "street" and "country" variables because one country means 
 
 We will convert "city" and "state" into categorical variables. 
 ```{r}
-new_data = subset(data, select = -c(street, country) )
+new_data = subset(data, select = -c(street, country, statezip, city) )
 head(new_data)
-new_data$city<-as.factor(new_data$city)
-new_data$statezip<-as.factor(new_data$statezip)
 str(new_data)
 ```
 ```{r}
-
 #I want to change the code here to look better. 
 
 library("stringr")   
@@ -58,7 +61,7 @@ head(new_data)
 ```
 
 ```{r}
-fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + sqft_above + sqft_basement + yr_built + yr_renovated + city + statezip, data = new_data)
+fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + sqft_above + sqft_basement + yr_built + yr_renovated, data = new_data)
 summary(fit)
 ```
 ##Linear Regression with all variables look quite bad model since R squared is around 0.3. 
@@ -68,8 +71,5 @@ Let's drop two categorical columns "statezip" and "city"
 new_fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + sqft_above + sqft_basement + yr_built + yr_renovated, data = new_data)
 summary(new_fit)
 ```
-##The model seems to be worse than before.
-```{r}
-
-```
+=
 

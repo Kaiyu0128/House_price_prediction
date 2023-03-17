@@ -6,7 +6,7 @@ date: "2023-02-28"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-data <- read.csv('~/Desktop/math_448/Project/data.csv')
+data <- read.csv('~/Desktop/math_448/Project/House_price_prediction/data.csv')
 print(paste("Number of records: ", nrow(data)))
 print(paste("Number of features: ", ncol(data)))
 head(data)
@@ -71,4 +71,12 @@ summary(new_fit)
 ##The model seems to be worse than before.
 ```{r}
 ```
+
+
+
+
+
+
+
+
 
