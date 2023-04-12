@@ -6,6 +6,8 @@ output:
 date: "2023-02-28"
 ---
 
+#In this file, We will try to use linear Regression model to predict housing price. 
+
 ####summary and visualization
 
 ```{r}
@@ -19,8 +21,8 @@ str(data)
 #checking variables
 ```{r}
 length(unique(data$city)) #There are 44 unique city. 
-length(unique(data$country)) #There is only 1 country which should mean nothing
-length(unique(data$statezip)) #77 different kinds of statezip
+length(unique(data$country)) #There is only 1 country.
+length(unique(data$statezip)) #77 different kinds of statezip.
 length(unique(data$street)) #4525 that is too much
 ```
 
@@ -55,6 +57,8 @@ summary(fit)
 Let's drop two categorical columns "statezip" and "city"
 
 ```{r}
-new_fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + sqft_above + sqft_basement + yr_built + yr_renovated, data = new_data)
+#I dropped nonsignificant columns which are "yr_renovated", "sqft_basement" and "sqft_above"
+new_fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + yr_built, data = new_data)
 summary(new_fit)
 ```
+As you can see, it did not change r squared and adjusted r square.
