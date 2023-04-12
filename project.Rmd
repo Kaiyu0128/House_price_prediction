@@ -1,8 +1,9 @@
 ---
 title: "project X"
 output: html_document
-date: "2023-02-28"
+date: "2023-03-30"
 ---
+vewv
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -10,7 +11,6 @@ data <- read.csv('~/Desktop/math_448/Project/House_price_prediction/data.csv')
 print(paste("Number of records: ", nrow(data)))
 print(paste("Number of features: ", ncol(data)))
 head(data)
-
 ```
 
 
@@ -73,6 +73,10 @@ summary(new_fit)
 ```
 
 
+```{r}
+a = dbinom(14, size=15, prob=0.67) + dbinom(15, size=15, prob=0.67) 
+a
+```
 
 
 
