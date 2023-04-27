@@ -1,0 +1,15 @@
+---
+title: "new_model"
+author: "kaiyu"
+date: "2023-04-14"
+output: html_document
+---
+
+```{r}
+#importing dataset
+data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
+summary(data)
+str(data)
+```
+
+

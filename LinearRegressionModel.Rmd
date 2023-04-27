@@ -1,0 +1,155 @@
+---
+title: "housing price prediction"
+output:
+  word_document: default
+  html_document: default
+date: "2023-02-28"
+---
+
+#In this file, We will use linear Regression model to predict housing price. 
+
+####summary of the data set
+```{r}
+data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv', stringsAsFactors = TRUE)
+summary(data)
+colnames(data)
+str(data)
+```
+#Data cleaning
+
+```{r}
+#49 observations were found with price = 0; 1 observation found with price = 7,800. Minimum price excluding outliers: 80,000.
+length(which(data$price==0))
+data <- subset(data, price >= 80000)
+#changing waterfront variable to factor
+data$waterfront <- as.factor(data$waterfront)
+summary(data)
+str(data)
+```
+
+
+#checking characteristic variables
+```{r}
+length(unique(data$city)) #There are 44 unique city. 
+length(unique(data$country)) #There is only 1 country(USA).
+length(unique(data$statezip)) #77 different kinds of statezip.
+length(unique(data$street)) #4525 that is too much.
+```
+
+#We are going to drop all characteristic variables except "year". 
+
+```{r}
+#new_data = subset(data, select = -c(street, country, statezip, city, view))
+#head(new_data)
+#str(new_data)
+```
+#all data in date is from 2014. 
+```{r}
+# Sample data frame with a characteristic variable 'y'
+df <- data.frame(y = data$date)
+
+# Use grepl to create a logical vector indicating whether each value in 'y' contains the word "2014"
+contains_2014 <- grepl("2014", df$y)
+
+# Use ! to invert the logical vector (i.e., TRUE becomes FALSE and vice versa)
+does_not_contain_2014 <- !contains_2014
+
+# Use sum to count the number of TRUE values in the vector (i.e., the number of rows where 'y' does not contain "2014")
+count <- sum(does_not_contain_2014)
+
+# Print the result
+print(count)
+```
+It looks like all the housings are from the year of 2014.Therefore we are just going to drop this column and make a new column that indicate the years of the house. To show that, we are going to subtract "2014" by "the years it was built". 
+
+```{r}
+new_data = subset(new_data, select = -c(date))
+sum(is.na(new_data))
+head(new_data)
+```
+
+
+
+```{r}
+fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + condition + sqft_above + sqft_basement + yr_built + yr_renovated, data = new_data)
+summary(fit)
+```
+##Linear Regression with all variables look quite bad model since R squared is around 0.3. 
+
+```{r}
+#I dropped nonsignificant columns which are "yr_renovated", "sqft_basement" and "sqft_above"
+new_fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + condition + yr_built, data = new_data)
+summary(new_fit)
+```
+
+As you can see, it did not change r squared and adjusted r square.
+
+# Correlation Matrix
+```{r}
+cor(new_data[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built")])
+```
+#we found correlation between bathrooms and sqft living is strong, so we decided to drop bathrooms and fit a linear regression. 
+```{r}
+new_fit <- lm(price ~ bedrooms + sqft_living + sqft_lot + floors + waterfront + condition + yr_built, data = new_data)
+summary(new_fit)
+```
+
+```{r}
+library(ggplot2)
+final_data <- subset(new_data, select = -c(bathrooms, sqft_above, sqft_basement))
+summary(final_data)
+set.seed(1)
+
+
+# Training and test sets
+train = sample(1:nrow(final_data), nrow(final_data)*0.8) # 80/20
+test = (-train)
+y.test = final_data$price[test]
+
+# Dataframes
+train.df = data.frame(final_data[train,])
+test.df = data.frame(final_data[test,])
+
+#Fit a linear model using least squares on the training set, and report the test error obtained.
+
+# Test MSE using lm() function. 
+lm.fit = lm(price~., data=train.df)
+lm.pred = predict(lm.fit, test.df, type=c("response"))
+err.lm = mean((lm.pred-test.df$price)^2)
+err.lm
+
+
+#visualizing the fit on the dataset.
+ggplot2(data, aes(x = price, y = .)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, linetype = "solid", color = "blue", aes(group = 1)) +
+  labs(title = "Linear Regression Fit",
+       x = "price",
+       y = "Miles per Gallon") +
+  theme_minimal()
+```
+
+
+
+#experiement fit: only Seattle data
+
+```{r}
+# seattle.df <- subset(data, city == "Seattle")
+# seattle.df = subset(seattle.df, select = -c(waterfront, sqft_above, sqft_basement, street, country, city, statezip, date))
+# summary(seattle.df)
+# 
+# # Dataframes
+# seattle_train.df = data.frame(seattle.df[train,])
+# seattle_test.df = data.frame(seattle.df[test,])
+# 
+# #Fit a linear model using least squares on the training set, and report the test error obtained.
+# 
+# # Test MSE using lm() function. 
+# lm.fit = lm(price~. - sqft_lot -condition -yr_renovated, data=seattle.df)
+# lm.pred = predict(lm.fit, seattle_test.df, type=c("response"))
+# err.lm = mean((lm.pred-test.df$price)^2)
+# err.lm
+# summary(lm.fit)
+```
+
+
