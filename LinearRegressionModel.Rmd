@@ -1,155 +1,146 @@
 ---
-title: "housing price prediction"
+title: "House Price Prediction: Linear Regression and the Lasso"
 output:
   word_document: default
   html_document: default
-date: "2023-02-28"
+date: "2023-04-27"
 ---
 
-#In this file, We will use linear Regression model to predict housing price. 
+#Introduction
+In this file, we will use a linear regression model and the lasso to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
 
-####summary of the data set
+#Summary of the data set
 ```{r}
-data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv', stringsAsFactors = TRUE)
-summary(data)
-colnames(data)
+data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv',
+                 stringsAsFactors = TRUE)
 str(data)
+summary(data)
 ```
+
 #Data cleaning
-
+We immediately remove the observations with price = 0. Waterfront needs to be converted to a factor variable. The variables sqft_above and sqft_basement will be dropped, since their sum is the variable sqft_living. Also, we do not know the meaning of the view variable, so we choose to exclude it from the model. Next, we drop the following variables: date, street, statezip, and country. Including zip codes as factors would increase the number of variables greatly, so we decide not to consider them in the model. Once the data is , cleaned, we will take a subset of only the Seattle entries.
 ```{r}
-#49 observations were found with price = 0; 1 observation found with price = 7,800. Minimum price excluding outliers: 80,000.
-length(which(data$price==0))
-data <- subset(data, price >= 80000)
-#changing waterfront variable to factor
-data$waterfront <- as.factor(data$waterfront)
-summary(data)
-str(data)
+data2 <- subset(data, price > 0)
+data2$waterfront <- as.factor(data2$waterfront)
+data2 <- subset(data2, select = -c(sqft_above,sqft_basement, view, 
+                                   date, street, statezip, country)) 
+summary(data2)
 ```
 
-
-#checking characteristic variables
-```{r}
-length(unique(data$city)) #There are 44 unique city. 
-length(unique(data$country)) #There is only 1 country(USA).
-length(unique(data$statezip)) #77 different kinds of statezip.
-length(unique(data$street)) #4525 that is too much.
-```
-
-#We are going to drop all characteristic variables except "year". 
+Now we clean the response variable: price.
 
 ```{r}
-#new_data = subset(data, select = -c(street, country, statezip, city, view))
-#head(new_data)
-#str(new_data)
+data2 <- subset(data2, price != 7800) #Low outlier found
+boxplot(data2$price) #with outliers
+#identify and remove outliers. R does this using the 1.5*IQR criterion
+outliers <- boxplot(data2$price, plot=FALSE)$out
+data2 <- data2[-which(data2$price %in% outliers),]
 ```
-#all data in date is from 2014. 
 ```{r}
-# Sample data frame with a characteristic variable 'y'
-df <- data.frame(y = data$date)
-
-# Use grepl to create a logical vector indicating whether each value in 'y' contains the word "2014"
-contains_2014 <- grepl("2014", df$y)
-
-# Use ! to invert the logical vector (i.e., TRUE becomes FALSE and vice versa)
-does_not_contain_2014 <- !contains_2014
-
-# Use sum to count the number of TRUE values in the vector (i.e., the number of rows where 'y' does not contain "2014")
-count <- sum(does_not_contain_2014)
-
-# Print the result
-print(count)
+hist(data2$price)
+plot(density(log(data2$price)))
 ```
-It looks like all the housings are from the year of 2014.Therefore we are just going to drop this column and make a new column that indicate the years of the house. To show that, we are going to subtract "2014" by "the years it was built". 
 
+We notice that price has a right skew, so we will check the fit for log(price) along with price.
+
+#Exploratory Data Analysis
 ```{r}
-new_data = subset(new_data, select = -c(date))
-sum(is.na(new_data))
-head(new_data)
+#Create Seattle data frame
+seattle.df = subset(data2, city == "Seattle")
+seattle.df = subset(seattle.df, select = -c(city))
+dim(seattle.df)
+summary(seattle.df)
 ```
 
-
+There is only one waterfront = 1 entry, so we will remove the waterfront variable in the model. 
 
 ```{r}
-fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + condition + sqft_above + sqft_basement + yr_built + yr_renovated, data = new_data)
-summary(fit)
+# Drop waterfront
+seattle.df = subset(seattle.df, select = -c(waterfront))
 ```
-##Linear Regression with all variables look quite bad model since R squared is around 0.3. 
+
+Now each predictor is numerical. The Seattle data frame consists of 1461 houses with 9 variables. 
 
 ```{r}
-#I dropped nonsignificant columns which are "yr_renovated", "sqft_basement" and "sqft_above"
-new_fit <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + condition + yr_built, data = new_data)
-summary(new_fit)
+#Price
+boxplot(seattle.df$price)
+summary(seattle.df$price)
+hist(seattle.df$price)
+plot(density(log(seattle.df$price)))
 ```
+From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. 
 
-As you can see, it did not change r squared and adjusted r square.
-
-# Correlation Matrix
-```{r}
-cor(new_data[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built")])
-```
-#we found correlation between bathrooms and sqft living is strong, so we decided to drop bathrooms and fit a linear regression. 
-```{r}
-new_fit <- lm(price ~ bedrooms + sqft_living + sqft_lot + floors + waterfront + condition + yr_built, data = new_data)
-summary(new_fit)
-```
-
+#Splitting data into training and test sets
 ```{r}
 library(ggplot2)
-final_data <- subset(new_data, select = -c(bathrooms, sqft_above, sqft_basement))
-summary(final_data)
 set.seed(1)
 
-
 # Training and test sets
-train = sample(1:nrow(final_data), nrow(final_data)*0.8) # 80/20
+train = sample(1:nrow(seattle.df), nrow(seattle.df)*0.8) # 80/20 split
 test = (-train)
-y.test = final_data$price[test]
+price.test = seattle.df$price[test]
 
 # Dataframes
-train.df = data.frame(final_data[train,])
-test.df = data.frame(final_data[test,])
+train.df = data.frame(seattle.df[train,])
+test.df = data.frame(seattle.df[test,])
+```
 
-#Fit a linear model using least squares on the training set, and report the test error obtained.
 
-# Test MSE using lm() function. 
-lm.fit = lm(price~., data=train.df)
-lm.pred = predict(lm.fit, test.df, type=c("response"))
+#Full fit of the model
+```{r}
+seattle_full.lm = lm((price) ~ ., data=seattle.df, subset=train)
+summary(seattle_full.lm)
+seattle_full.lmlog = lm(log(price) ~ ., data=seattle.df, subset=train)
+summary(seattle_full.lmlog)
+```
+
+The price model performs better than the log(price) model (R2 = 0.48 vs. R2 = 0.45). After fitting the linear regression model, we find that yr_renovated is not significant.
+
+#Model 2: Remove non-significant variables
+```{r}
+seattle.lm2 = update(seattle_full.lm, ~ . -yr_renovated) 
+summary(seattle.lm2)
+
+#Test MSE 
+lm.pred = predict(seattle.lm2, test.df, type=c("response"))
 err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
-
-
-#visualizing the fit on the dataset.
-ggplot2(data, aes(x = price, y = .)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, linetype = "solid", color = "blue", aes(group = 1)) +
-  labs(title = "Linear Regression Fit",
-       x = "price",
-       y = "Miles per Gallon") +
-  theme_minimal()
 ```
 
-
-
-#experiement fit: only Seattle data
+#Model Adequacy Checking
+Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, 4) normally-distributed residuals
 
 ```{r}
-# seattle.df <- subset(data, city == "Seattle")
-# seattle.df = subset(seattle.df, select = -c(waterfront, sqft_above, sqft_basement, street, country, city, statezip, date))
-# summary(seattle.df)
-# 
-# # Dataframes
-# seattle_train.df = data.frame(seattle.df[train,])
-# seattle_test.df = data.frame(seattle.df[test,])
-# 
-# #Fit a linear model using least squares on the training set, and report the test error obtained.
-# 
-# # Test MSE using lm() function. 
-# lm.fit = lm(price~. - sqft_lot -condition -yr_renovated, data=seattle.df)
-# lm.pred = predict(lm.fit, seattle_test.df, type=c("response"))
-# err.lm = mean((lm.pred-test.df$price)^2)
-# err.lm
-# summary(lm.fit)
+#Checking multicollinearity
+cor(seattle.df[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built", "yr_renovated")])
 ```
 
+Since every coefficient is less than 0.75, we will assume there is little multicollinearity and leave the variables as they are. 
 
+```{r}
+#Checking linear relationship between response and predictors
+#May need to transform predictors (e.g. log-transform)
+
+
+```
+
+```{r}
+#Checking residuals
+plot(seattle.lm2)
+```
+
+There is nothing unusual with the residuals. We can assume the variables are normally distributed. 
+
+#Model 3: Transform predictors
+```{r}
+seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
+summary(seattle.lm3)
+
+#Test MSE 
+lm.pred = predict(seattle.lm3, test.df, type=c("response"))
+err.lm = mean((lm.pred-test.df$price)^2)
+err.lm
+```
+
+ROUGH DRAFT: 
+Summary. Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. We have a large mean square error = 22455792622, which we want to reduce. There is too much variance in the model. Next, we will use the lasso, which will hopefully improve on the linear regression model. 
