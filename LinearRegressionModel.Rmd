@@ -6,10 +6,10 @@ output:
 date: "2023-04-27"
 ---
 
-#Introduction
+### Introduction
 In this file, we will use a linear regression model and the lasso to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
 
-#Summary of the data set
+### Summary of the data set
 ```{r}
 data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv',
                  stringsAsFactors = TRUE)
@@ -17,7 +17,7 @@ str(data)
 summary(data)
 ```
 
-#Data cleaning
+### Data cleaning
 We immediately remove the observations with price = 0. Waterfront needs to be converted to a factor variable. The variables sqft_above and sqft_basement will be dropped, since their sum is the variable sqft_living. Also, we do not know the meaning of the view variable, so we choose to exclude it from the model. Next, we drop the following variables: date, street, statezip, and country. Including zip codes as factors would increase the number of variables greatly, so we decide not to consider them in the model. Once the data is , cleaned, we will take a subset of only the Seattle entries.
 ```{r}
 data2 <- subset(data, price > 0)
@@ -43,9 +43,9 @@ plot(density(log(data2$price)))
 
 We notice that price has a right skew, so we will check the fit for log(price) along with price.
 
-#Exploratory Data Analysis
+### Exploratory Data Analysis
 ```{r}
-#Create Seattle data frame
+# Create Seattle data frame
 seattle.df = subset(data2, city == "Seattle")
 seattle.df = subset(seattle.df, select = -c(city))
 dim(seattle.df)
@@ -62,7 +62,7 @@ seattle.df = subset(seattle.df, select = -c(waterfront))
 Now each predictor is numerical. The Seattle data frame consists of 1461 houses with 9 variables. 
 
 ```{r}
-#Price
+# Price
 boxplot(seattle.df$price)
 summary(seattle.df$price)
 hist(seattle.df$price)
@@ -70,7 +70,33 @@ plot(density(log(seattle.df$price)))
 ```
 From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. 
 
-#Splitting data into training and test sets
+```{r}
+# Relationships between response and predictors
+par(mfrow = c(2, 2))
+plot(price ~ bedrooms, data = seattle.df, main="Price vs Bedrooms", lwd=2)
+  abline(lm(price~bedrooms, data=seattle.df),col="red",lwd=2)
+plot(price ~ bathrooms, data = seattle.df, main="Price vs Bathrooms", lwd=2)
+  abline(lm(price~bathrooms, data=seattle.df),col="red",lwd=2)
+plot(price ~ sqft_living, data = seattle.df, main="Price vs Sqft_living", lwd=2)
+  abline(lm(price~sqft_living, data=seattle.df),col="red",lwd=2)
+plot(price ~ sqft_lot, data = seattle.df, main="Price vs Sqft_lot", lwd=2)
+  abline(lm(price~sqft_lot, data=seattle.df),col="red",lwd=2)
+plot(price ~ floors, data = seattle.df, main="Price vs Floors", lwd=2)
+  abline(lm(price~floors, data=seattle.df),col="red",lwd=2)
+plot(price ~ condition, data = seattle.df, main="Price vs Condition", lwd=2)
+  abline(lm(price~condition, data=seattle.df),col="red",lwd=2)
+plot(price ~ yr_built, data = seattle.df, main="Price vs Year built", lwd=2)
+  abline(lm(price~yr_built, data=seattle.df),col="red",lwd=2)
+plot(price ~ yr_renovated, data = seattle.df, main="Price vs Year renovated", lwd=2)
+  abline(lm(price~yr_renovated, data=seattle.df),col="red",lwd=2)
+
+```
+
+There appears to be no linear relationship between price and sqft_lot, price and yr_built, and price and yr_renovated. Price is positively correlated with all other predictors. 
+
+### Creating the model
+
+#### Splitting data into training and test sets
 ```{r}
 library(ggplot2)
 set.seed(1)
@@ -86,7 +112,7 @@ test.df = data.frame(seattle.df[test,])
 ```
 
 
-#Full fit of the model
+#### Full fit of the model
 ```{r}
 seattle_full.lm = lm((price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lm)
@@ -96,7 +122,7 @@ summary(seattle_full.lmlog)
 
 The price model performs better than the log(price) model (R2 = 0.48 vs. R2 = 0.45). After fitting the linear regression model, we find that yr_renovated is not significant.
 
-#Model 2: Remove non-significant variables
+#### Model 2: Remove non-significant variables
 ```{r}
 seattle.lm2 = update(seattle_full.lm, ~ . -yr_renovated) 
 summary(seattle.lm2)
@@ -107,40 +133,94 @@ err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
 ```
 
-#Model Adequacy Checking
-Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, 4) normally-distributed residuals
+#### Model Adequacy Checking
+Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal.
 
 ```{r}
-#Checking multicollinearity
+# Checking multicollinearity
 cor(seattle.df[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built", "yr_renovated")])
 ```
 
 Since every coefficient is less than 0.75, we will assume there is little multicollinearity and leave the variables as they are. 
 
 ```{r}
-#Checking linear relationship between response and predictors
-#May need to transform predictors (e.g. log-transform)
-
-
 ```
 
+Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_living and yr_built have no linear relationship with price. We apply a log-transformation to these predictors.
+
 ```{r}
-#Checking residuals
+# Need linear relationship between response and predictors 
+# Check if log-transform yields linear relationship
+plot(price ~ I(log(sqft_living)), data = seattle.df, main="Price vs Sqft_living", lwd=2)
+  abline(lm(price~I(log(sqft_living)), data=seattle.df),col="red",lwd=2)
+plot(price ~ I(log(yr_built)), data = seattle.df, main="Price vs Year built", lwd=2)
+  abline(lm(price~I(log(yr_built)), data=seattle.df),col="red",lwd=2)
+```
+
+Price and log(sqft_living) are positively correlated, so we will include log(sqft_living) instead of sqft_living.
+
+Now we check the residuals.
+
+```{r}
+# Checking residuals
 plot(seattle.lm2)
 ```
+There is nothing unusual with the residuals. We can assume the variables are normally distributed and variances are equal.
 
-There is nothing unusual with the residuals. We can assume the variables are normally distributed. 
-
-#Model 3: Transform predictors
+#### Model 3: Transform predictors
 ```{r}
+#Transform sqft_living
 seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
 summary(seattle.lm3)
 
-#Test MSE 
+# Test MSE 
 lm.pred = predict(seattle.lm3, test.df, type=c("response"))
 err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
 ```
 
-ROUGH DRAFT: 
-Summary. Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. We have a large mean square error = 22455792622, which we want to reduce. There is too much variance in the model. Next, we will use the lasso, which will hopefully improve on the linear regression model. 
+This is the final main effect model. The model has an R^2 = 0.4906, which
+
+#### Model 4: Model 3 with first-order interaction terms
+```{r}
+seattle.lm4 = update(seattle_full.lm, ~ (. -yr_renovated -sqft_living + I(log(sqft_living)) )^2  )
+summary(seattle.lm4)
+
+# Test MSE 
+lm.pred = predict(seattle.lm3, test.df, type=c("response"))
+err.lm = mean((lm.pred-test.df$price)^2)
+err.lm
+```
+
+It appears that the interaction between bathrooms and floors, floors and yr_built, and floors and log(sqft_living) are significant. 
+
+```{r}
+seattle.lm5 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living 
+                     + I(log(sqft_living)) + bathrooms*floors + floors*yr_built
+                     + floors*I(log(sqft_living))  )
+summary(seattle.lm5)
+```
+
+#### Model 6: Remove insignficant variables
+```{r}
+seattle.lm6 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living 
+                     + I(log(sqft_living)) + bathrooms*floors 
+                     + floors*I(log(sqft_living))  )
+summary(seattle.lm6)
+```
+
+The standard errors from the model with interactions are higher and the model R^2 only improves by about 0.02, so we will keep the main effect model.
+
+### Final linear regression model
+```{r}
+seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
+summary(seattle.lm3)
+
+# Test MSE 
+lm.pred = predict(seattle.lm3, test.df, type=c("response"))
+err.lm = mean((lm.pred-test.df$price)^2)
+err.lm
+```
+
+### Conclusion
+Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. We have a large mean square error = 22455792622, which we want to reduce? Next, we will use the lasso, which will hopefully improve on the linear regression model. 
