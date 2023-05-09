@@ -11,5 +11,8 @@ data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
 summary(data)
 str(data)
 ```
+```{r}
+library(rpart)
+```
 
 
