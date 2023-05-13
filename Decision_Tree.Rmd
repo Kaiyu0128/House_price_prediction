@@ -4,15 +4,72 @@ author: "kaiyu"
 date: "2023-04-14"
 output: html_document
 ---
+### Introduction
+In this file, we will use a Decision tree model  to predict housing prices in Seattle, Washington in 2014
 
+##
 ```{r}
 #importing dataset
 data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
 summary(data)
 str(data)
 ```
+##dropping unnecessary variables(view, date, street, statezip, country)
 ```{r}
-library(rpart)
+data$rooms <- data$bedrooms + data$bathrooms
+data <- subset(data, select = -c(view, date, street, statezip, country, bedrooms, bathrooms))
+# Add a new column 'total_rooms' to the dataset
+data
 ```
+
+
+##spliting the dataset
+```{r}
+library(caTools)
+library(rpart)
+set.seed(123) 
+split = sample.split(data$price, SplitRatio = 0.7)
+training_set = subset(data, split == TRUE)
+test_set = subset(data, split == FALSE)
+test_set
+```
+
+##fitting a tree regression model
+```{r}
+regressor = rpart(price ~ ., data = training_set, control = rpart.control(minsplit = 20))
+summary(regressor)
+```
+
+##fitting a test
+```{r}
+y_pred = predict(regressor, newdata = test_set)
+```
+
+##using RMSE to see how much it fits
+```{r}
+rmse = sqrt(mean((test_set$price - y_pred)^2))
+print(paste('RMSE:', rmse))
+```
+##Visualize the fit
+```{r}
+# Predict values on your test data
+predictions <- predict(regressor, newdata = test_set)
+
+# Plot predicted vs actual values
+plot(test_set$price, predictions, main="Predicted vs Actual Values",
+     xlab="Actual", ylab="Predicted", xlim=range(0, max(test_set$price)),
+     ylim=range(0, max(test_set$price)))
+abline(a = 0, b = 1, col = "red")  # adds a y=x line indicating perfect prediction
+```
+
+
+
+##Visualizing the fit of a decision tree regression
+```{r}
+library(rpart.plot)
+rpart.plot(regressor)
+rpart.plot(regressor, compress = TRUE, fallen.leaves = TRUE)
+```
+
 
 
