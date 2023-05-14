@@ -5,11 +5,89 @@ date: "2023-05-13"
 output: html_document
 ---
 
+### Introduction
+In this file, we will use a Generalized Additive Model  to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
+
+### Summary of the data set(This is a dataset after cleaning)
 ```{r}
 #importing dataset
-data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
+data <- read.csv('/Users/kaiyuyokoi/Desktop/math_448/Project/House_price_prediction/Seattle.csv')
 summary(data)
 str(data)
+```
+
+#### Splitting data into training and test sets
+```{r}
+# Set a seed for reproducibility
+set.seed(123)
+
+# Determine the number of rows in the dataset
+n <- nrow(data)
+
+# Determine the number of rows for the training set (e.g., 70% of the data)
+n_train <- round(0.70 * n)
+
+# Randomly select rows for the training set
+train_indices <- sample(1:n, n_train)
+
+# Create the training set
+data_train <- data[train_indices, ]
+
+# Create the test set
+data_test <- data[-train_indices, ]
+```
+
+###explaining each variables relationship with price
+```{r}
+plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+```
+
+
+###fit the model
+```{r}
+library(mgcv)
+# Fit the model
+gam_model <- gam(price ~ s(bedrooms, k = 3) + s(bathrooms, k = 3) + s(sqft_living, k = 3) + s(sqft_lot, k = 3) + 
+                 s(floors, k = 2) + s(condition, k = 2) + s(yr_built, k = 3) + s(yr_renovated, k = 2), data = data_train)
+
+# Print a summary of the model
+summary(gam_model)
+
+```
+
+###check r squared and mse
+```{r}
+# Make predictions on the test data
+predictions <- predict(gam_model, newdata = data_test)
+
+# Calculate the Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((data_test$price - predictions)^2))
+
+# Print the RMSE
+print(paste("Root Mean Squared Error: ", rmse))
+
+# Calculate R-squared
+SSE = sum((predictions - data_test$price)^2)
+SST = sum((mean(data_train$price) - data_test$price)^2)
+R2 = 1 - SSE/SST
+
+# Print the R-squared
+print(paste("R-squared: ", R2))
+
+```
+"Root Mean Squared Error:  130935.937301265"
+"R-squared:  0.569826520777548"
+
+
+###visualize the fit of the model
+
+```{r}
+plot(data_test$price, predictions, 
+     xlab = "Actual values", 
+     ylab = "Predicted values",
+     main = "Actual vs Predicted values")
+# Add a line representing perfect predictions
+abline(a=0, b=1, col = "red")
 ```
 
 
