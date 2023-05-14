@@ -1,7 +1,0 @@
----
-title: "Generalized_Additive_Model"
-author: "kaiyu"
-date: "2023-05-13"
-output: html_document
----
-
