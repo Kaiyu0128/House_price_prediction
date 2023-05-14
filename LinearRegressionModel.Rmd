@@ -116,13 +116,20 @@ test.df = data.frame(seattle.df[test,])
 ```{r}
 seattle_full.lm = lm((price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lm)
+
+# Test MSE 
+lm_full.pred = predict(seattle_full.lm, test.df, type=c("response"))
+err.lm_full = mean((lm_full.pred-test.df$price)^2)
+err.lm_full
+
+# Log-transformed price
 seattle_full.lmlog = lm(log(price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lmlog)
 ```
 
 The price model performs better than the log(price) model (R2 = 0.48 vs. R2 = 0.45). After fitting the linear regression model, we find that yr_renovated is not significant.
 
-#### Model 2: Remove non-significant variables
+#### Model 2: Selection based on p-value
 ```{r}
 seattle.lm2 = update(seattle_full.lm, ~ . -yr_renovated) 
 summary(seattle.lm2)
@@ -138,6 +145,7 @@ Assumptions for linear regression: 1) little to no multicollinearity, 2) linear 
 
 ```{r}
 # Checking multicollinearity
+pairs(seattle.df)
 cor(seattle.df[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built", "yr_renovated")])
 ```
 
@@ -179,37 +187,25 @@ err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
 ```
 
-This is the final main effect model. The model has an R^2 = 0.4906, which
+Now we select a model using cross-validation.
 
-#### Model 4: Model 3 with first-order interaction terms
-```{r}
-seattle.lm4 = update(seattle_full.lm, ~ (. -yr_renovated -sqft_living + I(log(sqft_living)) )^2  )
-summary(seattle.lm4)
-
-# Test MSE 
-lm.pred = predict(seattle.lm3, test.df, type=c("response"))
-err.lm = mean((lm.pred-test.df$price)^2)
-err.lm
-```
-
-It appears that the interaction between bathrooms and floors, floors and yr_built, and floors and log(sqft_living) are significant. 
+#### Model 4: Selection using cross-validation
 
 ```{r}
-seattle.lm5 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living 
-                     + I(log(sqft_living)) + bathrooms*floors + floors*yr_built
-                     + floors*I(log(sqft_living))  )
-summary(seattle.lm5)
+# k-fold cross-validation; k=10
+library(boot)
+set.seed(1)
+
+seattle.glm1 = glm(price ~ ., data = seattle.df, subset=train)
+seattle.glm2 = glm(price ~ . - yr_renovated, data = seattle.df,subset=train)
+
+cv.error = cv.glm(seattle.df[train,],seattle.glm1,K=10)$delta[1]
+cv.error2 = cv.glm(seattle.df[train,],seattle.glm2,K=10)$delta[1]
 ```
 
-#### Model 6: Remove insignficant variables
-```{r}
-seattle.lm6 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living 
-                     + I(log(sqft_living)) + bathrooms*floors 
-                     + floors*I(log(sqft_living))  )
-summary(seattle.lm6)
-```
+### Model 5: Best subset selection
 
-The standard errors from the model with interactions are higher and the model R^2 only improves by about 0.02, so we will keep the main effect model.
+
 
 ### Final linear regression model
 ```{r}
@@ -220,7 +216,11 @@ summary(seattle.lm3)
 lm.pred = predict(seattle.lm3, test.df, type=c("response"))
 err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
+
+plot(test.df$price, lm.pred)
+abline(lm(lm.pred~test.df$price,
+          data=seattle.df),col="red",lwd=2)
 ```
 
 ### Conclusion
-Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. We have a large mean square error = 22455792622, which we want to reduce? Next, we will use the lasso, which will hopefully improve on the linear regression model. 
+Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. Next, we will use the lasso, which will hopefully improve on the linear regression model. 
