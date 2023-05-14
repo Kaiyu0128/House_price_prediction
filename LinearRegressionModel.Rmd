@@ -11,7 +11,7 @@ In this file, we will use a linear regression model and the lasso to predict hou
 
 ### Summary of the data set
 ```{r}
-data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv',
+data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',
                  stringsAsFactors = TRUE)
 str(data)
 summary(data)
@@ -199,17 +199,10 @@ Backward subset selection removes one predictor: yr_renovated. Thus the number o
 ```{r}
 #Transform sqft_living
 seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
-summary(seattle.lm3)
-
-# Test MSE 
-lm.pred = predict(seattle.lm3, test.df, type=c("response"))
-err.lm = mean((lm.pred-test.df$price)^2)
-err.lm
 ```
 
 ### Final linear regression model
 ```{r}
-seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
 summary(seattle.lm3)
 
 # Test MSE 
