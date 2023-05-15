@@ -1,13 +1,13 @@
 ---
-title: "House Price Prediction: Linear Regression and the Lasso"
+title: "House Price Prediction Model 1: Linear Regression"
 output:
   word_document: default
   html_document: default
-date: "2023-04-27"
+date: "2023-05-18"
 ---
 
 ### Introduction
-In this file, we will use a linear regression model and the lasso to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
+In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1461 after data cleaning). The response variable is price. 
 
 ### Summary of the data set
 ```{r}
@@ -121,6 +121,7 @@ summary(seattle_full.lm)
 lm_full.pred = predict(seattle_full.lm, test.df, type=c("response"))
 err.lm_full = mean((lm_full.pred-test.df$price)^2)
 err.lm_full
+rmse.lm.full = sqrt(err.lm_full)
 
 # Log-transformed price
 seattle_full.lmlog = lm(log(price) ~ ., data=seattle.df, subset=train)
@@ -129,7 +130,9 @@ summary(seattle_full.lmlog)
 
 The price model performs better than the log(price) model (R2 = 0.48 vs. R2 = 0.45). After fitting the linear regression model, we find that yr_renovated is not significant.
 
-#### Model 2: Selection based on p-value, and best subset selection
+### Variable Selection
+
+#### 1. Statistical significance selection (P-value selection)
 ```{r}
 seattle.lm2 = update(seattle_full.lm, ~ . -yr_renovated) 
 summary(seattle.lm2)
@@ -140,7 +143,7 @@ err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
 ```
 
-#### Model Adequacy Checking
+##### Model Adequacy Checking
 Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal.
 
 ```{r}
@@ -154,13 +157,15 @@ Since every coefficient is less than 0.75, we will assume there is little multic
 ```{r}
 ```
 
-Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_living and yr_built have no linear relationship with price. We apply a log-transformation to these predictors.
+Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_living, sqft_lot, and yr_built have no linear relationship with price. We apply a log-transformation to these predictors.
 
 ```{r}
 # Need linear relationship between response and predictors 
 # Check if log-transform yields linear relationship
 plot(price ~ I(log(sqft_living)), data = seattle.df, main="Price vs Sqft_living", lwd=2)
   abline(lm(price~I(log(sqft_living)), data=seattle.df),col="red",lwd=2)
+plot(price ~ I(log(sqft_lot)), data = seattle.df, main="Price vs Sqft_lot", lwd=2)
+  abline(lm(price~I(log(sqft_lot)), data=seattle.df),col="red",lwd=2)
 plot(price ~ I(log(yr_built)), data = seattle.df, main="Price vs Year built", lwd=2)
   abline(lm(price~I(log(yr_built)), data=seattle.df),col="red",lwd=2)
 ```
@@ -186,7 +191,7 @@ We fail to reject H0, so it is safe to assume the simpler model and the full mod
 
 Now we select a model using backward subset selection.
 
-#### Backward subset selection
+#### 2. Backward subset selection
 ```{r}
 # Backward subset selection
 library(MASS)
@@ -195,7 +200,7 @@ stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 
 Backward subset selection removes one predictor: yr_renovated. Thus the number of predictors is the same as in model 2. Now we will log-transform the necessary predictor, and use this as our linear regression model for prediction.
 
-#### Model 3: Transform predictors
+#### 3. Transform predictors
 ```{r}
 #Transform sqft_living
 seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
@@ -209,10 +214,12 @@ summary(seattle.lm3)
 lm.pred = predict(seattle.lm3, test.df, type=c("response"))
 err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
+rmse = sqrt(err.lm)
+rmse
 
-plot(test.df$price, lm.pred)
-abline(lm(lm.pred~test.df$price,
+plot(lm.pred, test.df$price, xlab="Predicted price", ylab="Actual price", main = "Actual vs. Predicted House Prices")
+abline(lm(test.df$price~lm.pred,
           data=seattle.df),col="red",lwd=2)
 ```
 ### Conclusion
-Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. Next, we will use the lasso, which will hopefully improve on the linear regression model. 
+Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 149852.6, so the average prediction of price is about $150,000 off. 
