@@ -11,7 +11,7 @@ In this file, we will use a spline model to predict housing prices in Seattle, W
 
 
 ```{r}
-data <- read.csv('/Users/kaiyuyokoi/Desktop/math_448/Project/House_price_prediction/Seattle.csv')
+data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
 summary(data)
 str(data)
 ```
@@ -25,8 +25,8 @@ set.seed(123)
 # Determine the number of rows in the dataset
 n <- nrow(data)
 
-# Determine the number of rows for the training set (e.g., 70% of the data)
-n_train <- round(0.70 * n)
+# Determine the number of rows for the training set (e.g., 80% of the data)
+n_train <- round(0.80 * n)
 
 # Randomly select rows for the training set
 train_indices <- sample(1:n, n_train)
@@ -121,5 +121,10 @@ abline(m, col = "red")
 
 # Plot the non-linear model
 plot(m1, residuals = TRUE, main = "Non-linear Model")
+```
+```{r}
+boxplot(seattle.df$sqft_lot, main="Boxplot of sqft_lot", ylab="sqft_lot")
+hist(seattle.df$sqft_lot, main="Histogram of sqft_lot", xlab="sqft_lot", col="lightblue", breaks=30)
+
 ```
 
