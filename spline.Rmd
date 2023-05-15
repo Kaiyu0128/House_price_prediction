@@ -1,0 +1,125 @@
+---
+title: "spline_model"
+author: "kaiyu"
+date: "2023-05-15"
+output: html_document
+---
+
+### Introduction
+In this file, we will use a spline model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
+
+
+
+```{r}
+data <- read.csv('/Users/kaiyuyokoi/Desktop/math_448/Project/House_price_prediction/Seattle.csv')
+summary(data)
+str(data)
+```
+
+
+
+```{r}
+# Set a seed for reproducibility
+set.seed(123)
+
+# Determine the number of rows in the dataset
+n <- nrow(data)
+
+# Determine the number of rows for the training set (e.g., 70% of the data)
+n_train <- round(0.70 * n)
+
+# Randomly select rows for the training set
+train_indices <- sample(1:n, n_train)
+
+# Create the training set
+data_train <- data[train_indices, ]
+
+# Create the test set
+data_test <- data[-train_indices, ]
+```
+
+###see correlation
+```{r}
+plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+```
+
+
+###fit model
+```{r}
+library(mgcv)
+library(tidyverse)
+spline <- gam(price ~ s(bedrooms, k = 4, bs = 'cr') + s(bathrooms, bs = 'cr') + s(sqft_living, bs = 'cr') + s(sqft_lot, bs = 'cr') + s(floors, k =4, bs = 'cr') + s(condition, k = 4, bs = 'cr') + s(yr_built, bs = 'cr') + s(yr_renovated, bs = 'cr'), data = data_train)
+```
+
+
+```{r}
+# Use the model to make predictions on the test set
+predictions <- predict(spline, newdata = data_test)
+
+# Create a data frame to hold the actual and predicted values
+results <- data.frame(Actual = data_test$price, Predicted = predictions)
+
+# Plot the actual vs predicted values
+ggplot(results, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(x = "Actual Values", y = "Predicted Values", title = "Actual vs Predicted Prices")
+
+```
+```{r}
+m <- gam(price ~ sqft_lot, data=data_train)    
+m1 <- gam(price ~ s(sqft_lot), data = data_train)
+```
+
+```{r}
+# Plot the linear model
+plot(data_train$sqft_lot, data_train$price, main = "Linear Model")
+abline(m, col = "red")
+
+# Plot the non-linear model
+plot(m1, residuals = TRUE, main = "Non-linear Model")
+```
+
+
+```{r}
+# Load necessary package
+library(tidyverse)
+
+# Create boxplot for 'price'
+boxplot(data$price, main = "Boxplot of Prices", ylab = "Price")
+
+# Create histogram for 'price'
+hist(data$price, main = "Histogram of Prices", xlab = "Price", breaks = 50)
+
+```
+```{r}
+# Calculate IQR for 'price'
+IQR_price <- IQR(data$price)
+
+# Calculate lower bound for 'price'
+lower_bound <- quantile(data$price, 0.25) - 1.5 * IQR_price
+
+# Calculate upper bound for 'price'
+upper_bound <- quantile(data$price, 0.75) + 1.5 * IQR_price
+
+# Filter out outliers
+data<- data %>%
+  filter(price >= lower_bound & price <= upper_bound)
+hist(data$price, main = "Histogram of Prices", xlab = "Price", breaks = 50)
+boxplot(data$price, main = "Boxplot of Prices", ylab = "Price")
+```
+
+```{r}
+m <- gam(price ~ sqft_lot, data=data)    
+m1 <- gam(price ~ s(sqft_lot), data = data)
+```
+
+```{r}
+plot(data$sqft_lot, data$price, main = "Linear Model")
+abline(m, col = "red")
+
+# Plot the non-linear model
+plot(m1, residuals = TRUE, main = "Non-linear Model")
+```
+

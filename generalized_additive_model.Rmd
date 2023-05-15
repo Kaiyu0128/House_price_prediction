@@ -40,6 +40,7 @@ data_test <- data[-train_indices, ]
 ###explaining each variables relationship with price
 ```{r}
 plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+#We see that "sqft_lot" and "sqft_living" are non-linear relationship. Others are linear relationship.
 ```
 
 
@@ -47,13 +48,43 @@ plot(ggeffects::ggpredict(gam_model), facets = TRUE)
 ```{r}
 library(mgcv)
 # Fit the model
-gam_model <- gam(price ~ s(bedrooms, k = 3) + s(bathrooms, k = 3) + s(sqft_living, k = 3) + s(sqft_lot, k = 3) + 
-                 s(floors, k = 2) + s(condition, k = 2) + s(yr_built, k = 3) + s(yr_renovated, k = 2), data = data_train)
+gam_model <- gam(price ~ s(bedrooms, k = 3) + s(bathrooms, k = 3) + s(sqft_living, k = 3) + s(sqft_lot, k = 3) + s(floors, k = 2) + s(condition, k = 2) + s(yr_built, k = 3) + s(yr_renovated, k = 2), data = data_train)
 
 # Print a summary of the model
 summary(gam_model)
+```
+```{r}
+gam_model1 <- gam(price ~ s(bedrooms, k=5) + s(bathrooms, k=5) + s(sqft_living, k=5) 
+                      + s(sqft_lot, k=5) + s(floors, k=5) + s(condition, k=5) 
+                      + s(yr_built, k=5) + s(yr_renovated, k=5), data = data_train)
+plot(gam_model, residuals = TRUE)
+predictions <- predict(gam_model1, newdata = data_test)
+plot(data_test$price, predictions, 
+     xlab = "Actual values", 
+     ylab = "Predicted values",
+     main = "Actual vs Predicted values")
+# Add a line representing perfect predictions
+abline(a=0, b=1, col = "red")
 
 ```
+```{r}
+# Predict on test data
+predictions <- predict(gam_model1, newdata = data_test)
+
+# Create a data frame for plotting
+plot_data <- data.frame(Actual = data_test$price, Predicted = predictions)
+
+# Plot actual vs predicted
+ggplot(plot_data, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  labs(title = "Actual vs Predicted Prices",
+       x = "Actual Prices",
+       y = "Predicted Prices")
+
+```
+
+
 
 ###check r squared and mse
 ```{r}

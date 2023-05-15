@@ -5,9 +5,8 @@ date: "2023-04-14"
 output: html_document
 ---
 ### Introduction
-In this file, we will use a Decision tree model  to predict housing prices in Seattle, Washington in 2014
+In this file, we will use a decision tree model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
 
-##
 ```{r}
 #importing dataset
 data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
