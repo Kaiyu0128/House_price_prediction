@@ -11,7 +11,8 @@ In this file, we will use a multiple linear regression model to predict housing 
 
 ### Summary of the data set
 ```{r}
-data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',stringsAsFactors = TRUE)
+data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',
+                 stringsAsFactors = TRUE)
 str(data)
 summary(data)
 ```
@@ -35,7 +36,6 @@ boxplot(data2$price) #with outliers
 outliers <- boxplot(data2$price, plot=FALSE)$out
 data2 <- data2[-which(data2$price %in% outliers),]
 ```
-
 ```{r}
 hist(data2$price)
 plot(density(log(data2$price)))
@@ -69,6 +69,19 @@ hist(seattle.df$price)
 plot(density(log(seattle.df$price)))
 ```
 From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. 
+
+```{r}
+hist(seattle.df$bedrooms)
+hist(seattle.df$bathrooms)
+hist(seattle.df$sqft_living)
+hist(seattle.df$sqft_lot)
+hist(seattle.df$floors)
+hist(seattle.df$condition)
+hist(seattle.df$yr_built)
+hist(seattle.df$yr_renovated)
+```
+
+sqft_lot has a strong right skew, so we will consider using a log-transformation on sqft_lot.
 
 ```{r}
 # Relationships between response and predictors
@@ -203,7 +216,7 @@ Backward subset selection removes one predictor: yr_renovated. Thus the number o
 #### 3. Transform predictors
 ```{r}
 #Transform sqft_living
-seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)))
+seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)) - sqft_lot + I(log(sqft_lot)))
 ```
 
 ### Final linear regression model
@@ -222,4 +235,4 @@ abline(lm(test.df$price~lm.pred,
           data=seattle.df),col="red",lwd=2)
 ```
 ### Conclusion
-Our linear regression model of price resulted in an R^2 of 0.4906, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 149852.6, so the average prediction of price is about $150,000 off. 
+Our linear regression model of price resulted in an R^2 of 0.4918, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 149859.20, so the average prediction of price is about $150,000 off. 
