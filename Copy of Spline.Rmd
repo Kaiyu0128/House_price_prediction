@@ -1,7 +1,7 @@
 ---
 title: "spline_model"
-author: "kaiyu"
-date: "2023-05-15"
+author: "kaiyu and William"
+date: "2023-05-18"
 output: html_document
 ---
 
@@ -11,7 +11,8 @@ In this file, we will use a spline model to predict housing prices in Seattle, W
 
 
 ```{r}
-data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
+#data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
+data <- read.csv('/Users/linw/Desktop/House_price_prediction/Seattle.csv')
 summary(data)
 str(data)
 ```
@@ -20,7 +21,7 @@ str(data)
 
 ```{r}
 # Set a seed for reproducibility
-set.seed(123)
+set.seed(1)
 
 # Determine the number of rows in the dataset
 n <- nrow(data)
@@ -38,12 +39,17 @@ data_train <- data[train_indices, ]
 data_test <- data[-train_indices, ]
 ```
 
+###see correlation
+```{r}
+plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+```
+
+
 ###fit model
 ```{r}
 library(mgcv)
 library(tidyverse)
 spline <- gam(price ~ s(bedrooms, k = 4, bs = 'cr') + s(bathrooms, bs = 'cr') + s(sqft_living, bs = 'cr') + s(sqft_lot, bs = 'cr') + s(floors, k =4, bs = 'cr') + s(condition, k = 4, bs = 'cr') + s(yr_built, bs = 'cr') + s(yr_renovated, bs = 'cr'), data = data_train)
-summary(spline)
 ```
 
 

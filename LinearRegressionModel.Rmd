@@ -170,17 +170,17 @@ Since every coefficient is less than 0.75, we will assume there is little multic
 ```{r}
 ```
 
-Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_living, sqft_lot, and yr_built have no linear relationship with price. We apply a log-transformation to these predictors.
+Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_lot, yr_built, and yr_renovated appear to have no linear relationship with price. We apply a log-transformation to these predictors.
 
 ```{r}
 # Need linear relationship between response and predictors 
 # Check if log-transform yields linear relationship
-plot(price ~ I(log(sqft_living)), data = seattle.df, main="Price vs Sqft_living", lwd=2)
-  abline(lm(price~I(log(sqft_living)), data=seattle.df),col="red",lwd=2)
-plot(price ~ I(log(sqft_lot)), data = seattle.df, main="Price vs Sqft_lot", lwd=2)
+plot(price ~ I(log(sqft_lot)), data = seattle.df, main="Price vs log(sqft_lot)", lwd=2)
   abline(lm(price~I(log(sqft_lot)), data=seattle.df),col="red",lwd=2)
-plot(price ~ I(log(yr_built)), data = seattle.df, main="Price vs Year built", lwd=2)
+plot(price ~ I(log(yr_built)), data = seattle.df, main="Price vs log(yr_built)", lwd=2)
   abline(lm(price~I(log(yr_built)), data=seattle.df),col="red",lwd=2)
+plot(price ~ I(log(yr_renovated+0.5)), data = seattle.df, main="Price vs log(yr_renovated+0.5)", lwd=2)
+  abline(lm(price~I(log(yr_renovated+0.5)), data=seattle.df),col="red",lwd=2)
 ```
 
 Price and log(sqft_living) are positively correlated, so we will include log(sqft_living) instead of sqft_living.
@@ -211,12 +211,12 @@ library(MASS)
 stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 ```
 
-Backward subset selection removes one predictor: yr_renovated. Thus the number of predictors is the same as in model 2. Now we will log-transform the necessary predictor, and use this as our linear regression model for prediction.
+Backward subset selection removes one predictor: yr_renovated. Thus the number of predictors is the same as in model 2. Now we will log-transform the necessary predictor, and use this model as our linear regression model for prediction.
 
 #### 3. Transform predictors
 ```{r}
 #Transform sqft_living
-seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated -sqft_living + I(log(sqft_living)) - sqft_lot + I(log(sqft_lot)))
+seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated - sqft_lot + I(log(sqft_lot)))
 ```
 
 ### Final linear regression model
@@ -235,4 +235,4 @@ abline(lm(test.df$price~lm.pred,
           data=seattle.df),col="red",lwd=2)
 ```
 ### Conclusion
-Our linear regression model of price resulted in an R^2 of 0.4918, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 149859.20, so the average prediction of price is about $150,000 off. 
+Our linear regression model of price resulted in an R^2 of 0.4854, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 146234.26, which means our model's estimate of housing prices is off by that much on average. 
