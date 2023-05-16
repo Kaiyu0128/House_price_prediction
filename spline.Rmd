@@ -17,7 +17,6 @@ str(data)
 ```
 
 
-
 ```{r}
 # Set a seed for reproducibility
 set.seed(123)
@@ -36,11 +35,6 @@ data_train <- data[train_indices, ]
 
 # Create the test set
 data_test <- data[-train_indices, ]
-```
-
-###see correlation
-```{r}
-plot(ggeffects::ggpredict(gam_model), facets = TRUE)
 ```
 
 

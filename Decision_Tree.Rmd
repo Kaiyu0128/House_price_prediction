@@ -5,70 +5,178 @@ date: "2023-04-14"
 output: html_document
 ---
 ### Introduction
-In this file, we will use a decision tree model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
-
+In this file, we will use a random forest model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
+###importing a dataset
 ```{r}
 #importing dataset
-data <- read.csv('~/Desktop/math_448/Project/House_Price_Prediction/data.csv')
+data <- read.csv('~/Desktop/House_Price_Prediction/Seattle.csv')
 summary(data)
 str(data)
 ```
-##dropping unnecessary variables(view, date, street, statezip, country)
-```{r}
-data$rooms <- data$bedrooms + data$bathrooms
-data <- subset(data, select = -c(view, date, street, statezip, country, bedrooms, bathrooms))
-# Add a new column 'total_rooms' to the dataset
-data
-```
 
-
-##spliting the dataset
+###splitting into training and test dataset
 ```{r}
-library(caTools)
 library(rpart)
-set.seed(123) 
-split = sample.split(data$price, SplitRatio = 0.7)
-training_set = subset(data, split == TRUE)
-test_set = subset(data, split == FALSE)
-test_set
+library(randomForest)
+set.seed(123)  # for reproducibility
+train_index <- sample(1:nrow(data), 0.8 * nrow(data))
+train <- data[train_index, ]
+test <- data[-train_index, ]
 ```
 
-##fitting a tree regression model
+
+###convert yr_built to age of house, price to log price and set hyperparameters for random forest
 ```{r}
-regressor = rpart(price ~ ., data = training_set, control = rpart.control(minsplit = 20))
-summary(regressor)
+library(randomForest)
+# Create new features in both train and test sets
+train$age_of_house <- max(train$yr_built) - train$yr_built
+train$renovated <- as.integer(train$yr_renovated > 0)  # binary indicator of renovation
+train$yr_built <- NULL
+train$yr_renovated <- NULL
+
+test$age_of_house <- max(test$yr_built) - test$yr_built
+test$renovated <- as.integer(test$yr_renovated > 0)  # binary indicator of renovation
+test$yr_built <- NULL
+test$yr_renovated <- NULL
+
+# Log-transform the target variable
+train$log_price <- log(train$price)
+test$log_price <- log(test$price)
+
+# Set hyperparameters
+mtry <- sqrt(ncol(train) - 1)   # mtry is typically square root of the number of features
+ntree <- 500                     # number of trees, can adjust as needed
 ```
 
-##fitting a test
+
+###train random forest
 ```{r}
-y_pred = predict(regressor, newdata = test_set)
+# Train the Random Forest model
+tree <- randomForest(log_price ~ ., data=train, mtry=mtry, ntree=ntree, importance=TRUE)
+print(tree)
+
+tree_predictions <- predict(tree, newdata=test)
+
+# Convert predictions back to original scale
+tree_predictions <- exp(tree_predictions)
+
+tree_mse <- mean((test$price - tree_predictions)^2)
+print(paste("Random Forest MSE: ", tree_mse))
 ```
 
-##using RMSE to see how much it fits
+###find the best mse by trying numbers of mtry and ntree. 
 ```{r}
-rmse = sqrt(mean((test_set$price - y_pred)^2))
-print(paste('RMSE:', rmse))
+# Hyperparameter tuning
+mtry_values <- c(sqrt(ncol(train) - 1), sqrt(ncol(train) - 1) - 1, sqrt(ncol(train) - 1) + 1)
+ntree_values <- c(500, 1000, 1500)
+best_mse <- Inf
+best_mtry <- NA
+best_ntree <- NA
+
+for (mtry in mtry_values) {
+  for (ntree in ntree_values) {
+    set.seed(123)
+    model <- randomForest(log_price ~ ., data=train, mtry=mtry, ntree=ntree, importance=TRUE)
+    predictions <- predict(model, newdata=test)
+    predictions <- exp(predictions)  # Convert predictions back to original scale
+    mse <- mean((test$price - predictions)^2)
+    if (mse < best_mse) {
+      best_mse <- mse
+      best_mtry <- mtry
+      best_ntree <- ntree
+    }
+  }
+}
+
+print(paste("Best MSE: ", best_mse))
+print(paste("Best mtry: ", best_mtry))
+print(paste("Best ntree: ", best_ntree))
 ```
-##Visualize the fit
+
+
+###use the best model from above.
 ```{r}
-# Predict values on your test data
-predictions <- predict(regressor, newdata = test_set)
+# Set the seed for reproducibility
+set.seed(123)
 
-# Plot predicted vs actual values
-plot(test_set$price, predictions, main="Predicted vs Actual Values",
-     xlab="Actual", ylab="Predicted", xlim=range(0, max(test_set$price)),
-     ylim=range(0, max(test_set$price)))
-abline(a = 0, b = 1, col = "red")  # adds a y=x line indicating perfect prediction
+# Train the final model using the best hyperparameters
+final_model <- randomForest(log_price ~ ., data=train, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
+
+# Use the final model to make predictions on the test set
+final_predictions <- predict(final_model, newdata=test)
+
+# Convert predictions back to the original scale
+final_predictions <- exp(final_predictions)
+
+# Compute the MSE of the final model
+final_mse <- mean((test$price - final_predictions)^2)
+
+print(paste("Final Model MSE: ", final_mse))
 ```
 
 
+###cross validation
 
-##Visualizing the fit of a decision tree regression
 ```{r}
-library(rpart.plot)
-rpart.plot(regressor)
-rpart.plot(regressor, compress = TRUE, fallen.leaves = TRUE)
+# Number of folds
+k <- 5
+
+# Create k equally size folds
+folds <- cut(seq(1, nrow(train)), breaks=k, labels=FALSE)
+
+# For storing results
+mse_values <- vector("numeric", k)
+
+# Perform k-fold cross validation
+for(i in 1:k){
+  
+  # Segement your data by fold using the which() function 
+  test_indices <- which(folds==i, arr.ind=TRUE)
+  test_data <- train[test_indices, ]
+  train_data <- train[-test_indices, ]
+  
+  # Fit random forest model
+  set.seed(123)
+  model <- randomForest(log_price ~ ., data=train_data, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
+  
+  # Make predictions
+  predictions <- predict(model, newdata=test_data)
+  predictions <- exp(predictions)  # Convert predictions back to original scale
+  
+  # Compute MSE
+  mse_values[i] <- mean((test_data$price - predictions)^2)
+  
+}
+
+# The average MSE of all k folds
+average_mse <- mean(mse_values)
+
+print(paste("Average MSE from 5-fold CV: ", average_mse))
 ```
 
+considering price range is relatively big, this model can be said pretty robust. 
+
+###plotting the best model 
+```{r}
+# Final model predictions
+final_model <- randomForest(log_price ~ ., data=train, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
+final_predictions <- predict(final_model, newdata=test)
+final_predictions <- exp(final_predictions)  # Convert predictions back to original scale
+summary(final_model)
+# Plot true values vs predicted values
+plot(test$price, final_predictions, main="True vs Predicted Values", xlab="True Values", ylab="Predicted Values")
+abline(0, 1, col="red")  # adds a 45-degree line
+
+# Plot residuals vs fitted values
+residuals <- test$price - final_predictions
+plot(final_predictions, residuals, main="Residuals vs Fitted Values", xlab="Fitted Values", ylab="Residuals")
+abline(h=0, col="red")  # adds a horizontal line at 0
+
+```
+```{r}
+# Check variable importance
+importance(final_model)
+varImpPlot(final_model)
+```
 
 

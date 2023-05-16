@@ -11,7 +11,7 @@ In this file, we will use a Generalized Additive Model  to predict housing price
 ### Summary of the data set(This is a dataset after cleaning)
 ```{r}
 #importing dataset
-data <- read.csv('/Users/kaiyuyokoi/Desktop/math_448/Project/House_price_prediction/Seattle.csv')
+data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
 summary(data)
 str(data)
 ```
@@ -19,7 +19,7 @@ str(data)
 #### Splitting data into training and test sets
 ```{r}
 # Set a seed for reproducibility
-set.seed(123)
+set.seed(1)
 
 # Determine the number of rows in the dataset
 n <- nrow(data)
@@ -37,22 +37,8 @@ data_train <- data[train_indices, ]
 data_test <- data[-train_indices, ]
 ```
 
-###explaining each variables relationship with price
-```{r}
-plot(ggeffects::ggpredict(gam_model), facets = TRUE)
-#We see that "sqft_lot" and "sqft_living" are non-linear relationship. Others are linear relationship.
-```
-
 
 ###fit the model
-```{r}
-library(mgcv)
-# Fit the model
-gam_model <- gam(price ~ s(bedrooms, k = 3) + s(bathrooms, k = 3) + s(sqft_living, k = 3) + s(sqft_lot, k = 3) + s(floors, k = 2) + s(condition, k = 2) + s(yr_built, k = 3) + s(yr_renovated, k = 2), data = data_train)
-
-# Print a summary of the model
-summary(gam_model)
-```
 ```{r}
 gam_model1 <- gam(price ~ s(bedrooms, k=5) + s(bathrooms, k=5) + s(sqft_living, k=5) 
                       + s(sqft_lot, k=5) + s(floors, k=5) + s(condition, k=5) 
@@ -67,7 +53,13 @@ plot(data_test$price, predictions,
 abline(a=0, b=1, col = "red")
 
 ```
+###see correlation
 ```{r}
+plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+```
+
+```{r}
+library(ggplot2)
 # Predict on test data
 predictions <- predict(gam_model1, newdata = data_test)
 
@@ -81,7 +73,6 @@ ggplot(plot_data, aes(x = Actual, y = Predicted)) +
   labs(title = "Actual vs Predicted Prices",
        x = "Actual Prices",
        y = "Predicted Prices")
-
 ```
 
 
@@ -89,7 +80,7 @@ ggplot(plot_data, aes(x = Actual, y = Predicted)) +
 ###check r squared and mse
 ```{r}
 # Make predictions on the test data
-predictions <- predict(gam_model, newdata = data_test)
+predictions <- predict(gam_model1, newdata = data_test)
 
 # Calculate the Root Mean Squared Error (RMSE)
 rmse <- sqrt(mean((data_test$price - predictions)^2))
@@ -104,7 +95,6 @@ R2 = 1 - SSE/SST
 
 # Print the R-squared
 print(paste("R-squared: ", R2))
-
 ```
 "Root Mean Squared Error:  130935.937301265"
 "R-squared:  0.569826520777548"
@@ -120,8 +110,9 @@ plot(data_test$price, predictions,
 # Add a line representing perfect predictions
 abline(a=0, b=1, col = "red")
 ```
-
-
+```{r}
+summary(gam_model1)
+```
 
 
 
