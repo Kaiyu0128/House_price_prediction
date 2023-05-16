@@ -31,7 +31,7 @@ test.df = data.frame(seattle.df[test,])
 #### 4. The Lasso
 ```{r}
 library(glmnet)
-x = model.matrix(price ~ . -sqft_living + I((sqft_living)) -sqft_lot + I((sqft_lot)), data = seattle.df)[,-1]
+x = model.matrix(price ~ . -sqft_lot + I((sqft_lot)) -sqft_lot + I((sqft_lot)), data = seattle.df)[,-1]
 y = seattle.df$price
 ```
 
@@ -65,7 +65,7 @@ rootErr = sqrt(mean((lasso.pred-price.test)^2))
 rootErr
 ```
 
-The root mean squared error is 146390.98, which is slightly lower than the error from the multiple linear regression model (149852.57). 
+The root mean squared error is 146390.65, which is slightly higher than the error from OLS (146234.26). 
 
 ```{r}
 # R-squared
@@ -76,4 +76,4 @@ rsq <- 1 - rss/tss
 rsq
 ```
 
-The lasso model R2 = 0.51, so a little more than half of the variation in price is explained by the linear relationship with the predictors. This is a slight improvement from the multiple linear regression model R2 = 0.49.
+The lasso model R2 = 0.51, so a little more than half of the variation in price is explained by the linear relationship with the predictors. This is a slight improvement from the multiple linear regression model R2 = 0.485.
