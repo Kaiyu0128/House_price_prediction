@@ -1,5 +1,5 @@
 ---
-title: "spline_model"
+title: "Housing Price Prediction 3: Polynomial Regression and Splines"
 author: "kaiyu and William"
 date: "2023-05-18"
 output: html_document
@@ -8,18 +8,17 @@ output: html_document
 ### Introduction
 In this file, we will use a spline model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
 
-
-
 ```{r}
 #data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
 data <- read.csv('/Users/linw/Desktop/House_price_prediction/Seattle.csv')
+data$renovated = as.factor(data$renovated)
 summary(data)
 str(data)
 ```
 
-
-
 ```{r}
+# Training and test sets
+
 # Set a seed for reproducibility
 set.seed(1)
 
@@ -39,93 +38,171 @@ data_train <- data[train_indices, ]
 data_test <- data[-train_indices, ]
 ```
 
-###see correlation
+### Selecting optimal degrees for polynomial regression
+
+(All variables will be analyzed. The CV plots of variables and the code used to generate them that have an optimal degree polynomial of 1 won't be mentioned in this report.)
+
 ```{r}
-plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+# k-fold cross-validation 
+# to select optimal degree d for the polynomial
+# variable: floors
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(floors,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
 ```
-
-
-###fit model
-```{r}
-library(mgcv)
-library(tidyverse)
-spline <- gam(price ~ s(bedrooms, k = 4, bs = 'cr') + s(bathrooms, bs = 'cr') + s(sqft_living, bs = 'cr') + s(sqft_lot, bs = 'cr') + s(floors, k =4, bs = 'cr') + s(condition, k = 4, bs = 'cr') + s(yr_built, bs = 'cr') + s(yr_renovated, bs = 'cr'), data = data_train)
-```
-
+Degree 2 polynomial is optimal for the floors variable.
 
 ```{r}
-# Use the model to make predictions on the test set
-predictions <- predict(spline, newdata = data_test)
+# Plot of resulting polynomial fit to the data
 
-# Create a data frame to hold the actual and predicted values
-results <- data.frame(Actual = data_test$price, Predicted = predictions)
+xlims=range(data$floors)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~poly(floors,2), data=data),newdata=list(floors=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
 
-# Plot the actual vs predicted values
-ggplot(results, aes(x = Actual, y = Predicted)) +
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
-  theme_minimal() +
-  labs(x = "Actual Values", y = "Predicted Values", title = "Actual vs Predicted Prices")
-
-```
-```{r}
-m <- gam(price ~ sqft_lot, data=data_train)    
-m1 <- gam(price ~ s(sqft_lot), data = data_train)
-```
-
-```{r}
-# Plot the linear model
-plot(data_train$sqft_lot, data_train$price, main = "Linear Model")
-abline(m, col = "red")
-
-# Plot the non-linear model
-plot(m1, residuals = TRUE, main = "Non-linear Model")
-```
-
-
-```{r}
-# Load necessary package
-library(tidyverse)
-
-# Create boxplot for 'price'
-boxplot(data$price, main = "Boxplot of Prices", ylab = "Price")
-
-# Create histogram for 'price'
-hist(data$price, main = "Histogram of Prices", xlab = "Price", breaks = 50)
-
-```
-```{r}
-# Calculate IQR for 'price'
-IQR_price <- IQR(data$price)
-
-# Calculate lower bound for 'price'
-lower_bound <- quantile(data$price, 0.25) - 1.5 * IQR_price
-
-# Calculate upper bound for 'price'
-upper_bound <- quantile(data$price, 0.75) + 1.5 * IQR_price
-
-# Filter out outliers
-data<- data %>%
-  filter(price >= lower_bound & price <= upper_bound)
-hist(data$price, main = "Histogram of Prices", xlab = "Price", breaks = 50)
-boxplot(data$price, main = "Boxplot of Prices", ylab = "Price")
+#plot the data and add polynomial fit.
+plot(data$floors,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
 ```
 
 ```{r}
-m <- gam(price ~ sqft_lot, data=data)    
-m1 <- gam(price ~ s(sqft_lot), data = data)
+# CV for optimal degree
+# variable: condition
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(condition,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+Degree 4 polynomial is optimal for the condition variable.
+
+```{r}
+# Plot of resulting polynomial fit to the data
+
+xlims=range(data$condition)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~poly(condition,4), data=data),newdata=list(condition=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$condition,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-4 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+
+```{r}
+# CV for optimal d
+# variable: yr_built
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(yr_built,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+The CV error is lowest where degree = 4. However, degree 2 seems to be a good choice, so we will use degree 2 for the variable yr_built.
+
+```{r}
+# Plot of resulting polynomial fit to the data
+
+xlims=range(data$yr_built)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~poly(yr_built,2),data=data),newdata=list(yr_built=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$yr_built,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+### Polynomial regression
+
+```{r}
+fit.poly = lm(price ~ bedrooms + bathrooms + sqft_living + log(sqft_lot) + poly(floors,2) + poly(condition, 4) + poly(yr_built, 2) + renovated, data = data_train)
+summary(fit.poly)
 ```
 
 ```{r}
-plot(data$sqft_lot, data$price, main = "Linear Model")
-abline(m, col = "red")
-
-# Plot the non-linear model
-plot(m1, residuals = TRUE, main = "Non-linear Model")
+library(MASS)
+stepAIC(fit.poly)
 ```
+
 ```{r}
-boxplot(seattle.df$sqft_lot, main="Boxplot of sqft_lot", ylab="sqft_lot")
-hist(seattle.df$sqft_lot, main="Histogram of sqft_lot", xlab="sqft_lot", col="lightblue", breaks=30)
-
+fit.poly2 = lm(formula = price ~ bedrooms + bathrooms + sqft_living + log(sqft_lot) + 
+    poly(floors, 2) + poly(condition, 4) + poly(yr_built, 2), 
+    data = data_train)
+summary(fit.poly2)
 ```
 
+# Final polynomial regression model
+
+```{r}
+# Remove insignificant predictors
+fit.poly3 = lm(formula = price ~ bedrooms + bathrooms + sqft_living + log(sqft_lot) + 
+    poly(floors, 2) + condition + yr_built, 
+    data = data_train)
+summary(fit.poly3)
+```
+
+```{r}
+# Likelihood ratio test
+anova(fit.poly3, fit.poly, test= "LRT")
+```
+
+We observe a p-value = 0.383, so we fail to reject H0 and can safely assume the simpler model and complex models are the same.
+
+```{r}
+# Likelihood ratio test comparing linear model and polynomial model
+anova(lm(formula = price ~ bedrooms + bathrooms + sqft_living + log(sqft_lot) + 
+    floors + condition + yr_built, 
+    data = data_train),fit.poly3, test= "LRT")
+```
+
+We observe a p-value = 0.02, so we reject H0 and conclude that the polynomial model and the linear model are not the same. 
+
+
+# Cross-validation metrics
+```{r}
+library(caret)
+
+#specify the cross-validation method
+# k-fold CV; k=10
+ctrl <- trainControl(method = "cv", number = 10)
+
+#fit a regression model and use k-fold CV to evaluate performance
+model <- train((price) ~ bedrooms + bathrooms + sqft_living + poly(floors,2) + 
+    condition + yr_built + I(log(sqft_lot)), data = seattle.df, method = "lm", trControl = ctrl)
+
+#view summary of k-fold CV               
+print(model)
+```
+
+The ridge regression cross-validated RMSE = 144896.8, R2 = 0.4951, and MAE = 110158.7 Our polynomial regression model resulted in a RMSE = 144073.8 , R2 = 0.4969604, and MAE = 110127.4. Poly > ridge > OLS > lasso in terms of reducing RMSE.

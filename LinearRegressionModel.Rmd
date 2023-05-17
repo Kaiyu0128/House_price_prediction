@@ -1,5 +1,5 @@
 ---
-title: "House Price Prediction Model 1: Linear Regression"
+title: "House Price Prediction 1: Linear Regression"
 output:
   word_document: default
   html_document: default
@@ -15,19 +15,35 @@ data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',
                  stringsAsFactors = TRUE)
 str(data)
 summary(data)
+
+# Response variable: price
+hist(data$price)
+```
+
+```{r}
+# Display prices below $7 million
+hist(data$price[which(data$price < 7000000)])
 ```
 
 ### Data cleaning
-We immediately remove the observations with price = 0. Waterfront needs to be converted to a factor variable. The variables sqft_above and sqft_basement will be dropped, since their sum is the variable sqft_living. Also, we do not know the meaning of the view variable, so we choose to exclude it from the model. Next, we drop the following variables: date, street, statezip, and country. Including zip codes as factors would increase the number of variables greatly, so we decide not to consider them in the model. Once the data is , cleaned, we will take a subset of only the Seattle entries.
+We immediately remove the observations with price = 0. The variables sqft_above and sqft_basement will be dropped, since their sum is the variable sqft_living. Also, we do not know the meaning of the view variable, so we choose to exclude it from the model. Next, we drop the following variables: date, street, statezip, and country. Including zip codes as factors would increase the number of variables greatly, so we decide not to consider them in the model. The variable yr_renovated is converted into the variable "renovated" with levels 1 = Yes and 0 = No. Finally, renovated and waterfront are converted into factor variables.
+
+Once the data is cleaned, we will take a subset of only the Seattle entries.
 ```{r}
 data2 <- subset(data, price > 0)
-data2$waterfront <- as.factor(data2$waterfront)
 data2 <- subset(data2, select = -c(sqft_above,sqft_basement, view, 
                                    date, street, statezip, country)) 
+
+data2$yr_renovated[data2$yr_renovated>0] <- 1
+names(data2)[names(data2) == "yr_renovated"] <- "renovated"
+
+data2$waterfront <- as.factor(data2$waterfront)
+data2$renovated <- as.factor(data2$renovated)
+
 summary(data2)
 ```
 
-Now we clean the response variable: price.
+We note that waterfront is unbalanced, with a much greater proportion of 0s than 1s. Now we clean the response variable: price.
 
 ```{r}
 data2 <- subset(data2, price != 7800) #Low outlier found
@@ -38,12 +54,16 @@ data2 <- data2[-which(data2$price %in% outliers),]
 ```
 ```{r}
 hist(data2$price)
+plot(density(data2$price))
 plot(density(log(data2$price)))
 ```
 
-We notice that price has a right skew, so we will check the fit for log(price) along with price.
+Essentially, the top 15% of Washing house prices have been removed by using the 1.5*IQR criterion, and we remove one low outlier manually. Now that the Washington data is clean, we are ready to analyze the Seattle data.
 
 ### Exploratory Data Analysis
+
+We analyze the remaining predictors in the Seattle data set.
+
 ```{r}
 # Create Seattle data frame
 seattle.df = subset(data2, city == "Seattle")
@@ -59,16 +79,17 @@ There is only one waterfront = 1 entry, so we will remove the waterfront variabl
 seattle.df = subset(seattle.df, select = -c(waterfront))
 ```
 
-Now each predictor is numerical. The Seattle data frame consists of 1461 houses with 9 variables. 
+Now we have 8 numerical predictors and 1 categorical predictor. The Seattle data frame consists of 1461 houses with 9 variables. 
 
 ```{r}
 # Price
 boxplot(seattle.df$price)
 summary(seattle.df$price)
 hist(seattle.df$price)
+plot(density(seattle.df$price))
 plot(density(log(seattle.df$price)))
 ```
-From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. 
+From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. We notice that price is bell-shaped but is skewed right, so we will check the fit for log(price) along with price.
 
 ```{r}
 hist(seattle.df$bedrooms)
@@ -78,10 +99,10 @@ hist(seattle.df$sqft_lot)
 hist(seattle.df$floors)
 hist(seattle.df$condition)
 hist(seattle.df$yr_built)
-hist(seattle.df$yr_renovated)
+plot(seattle.df$renovated, col = c("red","blue"), main = "Renovated", ylab = "Count")
 ```
 
-sqft_lot has a strong right skew, so we will consider using a log-transformation on sqft_lot.
+sqft_lot is extremely right skewed, so we will use a log-transformation on sqft_lot.
 
 ```{r}
 # Relationships between response and predictors
@@ -100,9 +121,10 @@ plot(price ~ condition, data = seattle.df, main="Price vs Condition", lwd=2)
   abline(lm(price~condition, data=seattle.df),col="red",lwd=2)
 plot(price ~ yr_built, data = seattle.df, main="Price vs Year built", lwd=2)
   abline(lm(price~yr_built, data=seattle.df),col="red",lwd=2)
-plot(price ~ yr_renovated, data = seattle.df, main="Price vs Year renovated", lwd=2)
-  abline(lm(price~yr_renovated, data=seattle.df),col="red",lwd=2)
-
+plot(price ~ renovated, data = seattle.df, main="Price vs Renovated", lwd=2)
+par(mfrow = c(1, 1))
+hist(seattle.df$price[which(seattle.df$renovated == 1)])
+hist(seattle.df$price[which(seattle.df$renovated == 0)])
 ```
 
 There appears to be no linear relationship between price and sqft_lot, price and yr_built, and price and yr_renovated. Price is positively correlated with all other predictors. 
@@ -135,25 +157,28 @@ lm_full.pred = predict(seattle_full.lm, test.df, type=c("response"))
 err.lm_full = mean((lm_full.pred-test.df$price)^2)
 err.lm_full
 rmse.lm.full = sqrt(err.lm_full)
+rmse.lm.full
 
 # Log-transformed price
 seattle_full.lmlog = lm(log(price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lmlog)
 ```
 
-The price model performs better than the log(price) model (R2 = 0.48 vs. R2 = 0.45). After fitting the linear regression model, we find that yr_renovated is not significant.
+The price model performs better than the log(price) model (R2 = 0.4846 vs. R2 = 0.4526). After fitting the linear regression model, we find that the variable renovated is not significant.
 
 ### Variable Selection
 
 #### 1. Statistical significance selection (P-value selection)
 ```{r}
-seattle.lm2 = update(seattle_full.lm, ~ . -yr_renovated) 
+seattle.lm2 = update(seattle_full.lm, ~ . -renovated) 
 summary(seattle.lm2)
 
 #Test MSE 
 lm.pred = predict(seattle.lm2, test.df, type=c("response"))
 err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
+rmse.lm = sqrt(err.lm)
+rmse.lm
 ```
 
 ##### Model Adequacy Checking
@@ -162,15 +187,15 @@ Assumptions for linear regression: 1) little to no multicollinearity, 2) linear 
 ```{r}
 # Checking multicollinearity
 pairs(seattle.df)
-cor(seattle.df[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built", "yr_renovated")])
+cor(seattle.df[,c("price","bedrooms","bathrooms", "sqft_living", "sqft_lot","floors", "condition", "yr_built")])
 ```
 
-Since every coefficient is less than 0.75, we will assume there is little multicollinearity and leave the variables as they are. 
+Since every coefficient is less than 0.75, we will assume there is little multicollinearity and leave the variables as they are. Note: sqft_living and bathrooms seem to be the best individual predictors of price, with correlation coefficients of 0.64 and 0.42.
 
 ```{r}
 ```
 
-Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_lot, yr_built, and yr_renovated appear to have no linear relationship with price. We apply a log-transformation to these predictors.
+Now recall from the analysis of the individual scatterplots of price against the predictors that sqft_lot and yr_built appear to have no linear relationship with price. We apply a log-transformation to these predictors.
 
 ```{r}
 # Need linear relationship between response and predictors 
@@ -179,11 +204,8 @@ plot(price ~ I(log(sqft_lot)), data = seattle.df, main="Price vs log(sqft_lot)",
   abline(lm(price~I(log(sqft_lot)), data=seattle.df),col="red",lwd=2)
 plot(price ~ I(log(yr_built)), data = seattle.df, main="Price vs log(yr_built)", lwd=2)
   abline(lm(price~I(log(yr_built)), data=seattle.df),col="red",lwd=2)
-plot(price ~ I(log(yr_renovated+0.5)), data = seattle.df, main="Price vs log(yr_renovated+0.5)", lwd=2)
-  abline(lm(price~I(log(yr_renovated+0.5)), data=seattle.df),col="red",lwd=2)
 ```
-
-Price and log(sqft_living) are positively correlated, so we will include log(sqft_living) instead of sqft_living.
+The log-transform on yr_built doesn't appear much different. Since sqft_lot was skewed in our exploratory data analysis, we will apply a log-transform to sqft_lot in the next model. 
 
 Now we check the residuals.
 
@@ -200,7 +222,7 @@ Now we conduct a likelihood ratio test to compare nested models.
 anova(seattle.lm2, seattle_full.lm, test="LRT")
 ```
 
-We fail to reject H0, so it is safe to assume the simpler model and the full model are the same.
+With a p-value of 0.4706 > 0.05 we fail to reject H0, so it is safe to assume the simpler model and the full model are the same.
 
 Now we select a model using backward subset selection.
 
@@ -213,10 +235,10 @@ stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 
 Backward subset selection removes one predictor: yr_renovated. Thus the number of predictors is the same as in model 2. Now we will log-transform the necessary predictor, and use this model as our linear regression model for prediction.
 
-#### 3. Transform predictors
+#### 3. Log-transform predictor
 ```{r}
 #Transform sqft_living
-seattle.lm3 = update(seattle_full.lm, ~ . -yr_renovated - sqft_lot + I(log(sqft_lot)))
+seattle.lm3 = update(seattle_full.lm, ~ . - renovated - sqft_lot + I(log(sqft_lot)))
 ```
 
 ### Final linear regression model
@@ -229,10 +251,31 @@ err.lm = mean((lm.pred-test.df$price)^2)
 err.lm
 rmse = sqrt(err.lm)
 rmse
+```
 
+### Cross-validation metrics
+```{r}
+library(caret)
+
+#specify the cross-validation method
+# k-fold CV; k=10
+ctrl <- trainControl(method = "cv", number = 10)
+
+#fit a regression model and use k-fold CV to evaluate performance
+model <- train((price) ~ bedrooms + bathrooms + sqft_living + floors + 
+    condition + yr_built + I(log(sqft_lot)), data = seattle.df, method = "lm", trControl = ctrl)
+
+#view summary of k-fold CV               
+print(model)
+```
+
+Cross-validated RMSE = 144985, R2 = 0.4888, MAE = 110719.5. 
+
+```{r}
+# Plot of Actual vs. Predicted House Prices
 plot(lm.pred, test.df$price, xlab="Predicted price", ylab="Actual price", main = "Actual vs. Predicted House Prices")
 abline(lm(test.df$price~lm.pred,
           data=seattle.df),col="red",lwd=2)
 ```
 ### Conclusion
-Our linear regression model of price resulted in an R^2 of 0.4854, meaning that almost half of the variability in price is explained by a linear relationship with the predictors. The root mean squared error is 146234.26, which means our model's estimate of housing prices is off by that much on average. 
+Our linear regression model of price resulted in a cross-validated RMSE = 144985, R2 = 0.4888, and MAE = 110719.5. RMSE = 144985 is the standard deviation of the residuals. 48%, or a bit less than half, of the variability in price is explained by the linear relationship with the predictors. MAE = 110719.5 tells us that our predictions will be off by about 110,000 dollars on average.
