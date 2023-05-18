@@ -30,12 +30,12 @@ test <- data[-train_index, ]
 library(randomForest)
 # Create new features in both train and test sets
 train$age_of_house <- max(train$yr_built) - train$yr_built
-train$renovated <- as.integer(train$yr_renovated > 0)  # binary indicator of renovation
+train$renovated <- as.integer(train$renovated > 0)  # binary indicator of renovation
 train$yr_built <- NULL
-train$yr_renovated <- NULL
+train$renovated <- NULL
 
 test$age_of_house <- max(test$yr_built) - test$yr_built
-test$renovated <- as.integer(test$yr_renovated > 0)  # binary indicator of renovation
+test$renovated <- as.integer(test$renovated > 0)  # binary indicator of renovation
 test$yr_built <- NULL
 test$yr_renovated <- NULL
 
@@ -75,7 +75,7 @@ best_ntree <- NA
 
 for (mtry in mtry_values) {
   for (ntree in ntree_values) {
-    set.seed(123)
+    set.seed(1)
     model <- randomForest(log_price ~ ., data=train, mtry=mtry, ntree=ntree, importance=TRUE)
     predictions <- predict(model, newdata=test)
     mse <- mean((test$log_price - predictions)^2)
@@ -95,7 +95,7 @@ print(paste("Best ntree: ", best_ntree))
 
 ###use the best model from above.
 ```{r}
-set.seed(123)
+set.seed(1)
 final_model <- randomForest(log_price ~ ., data=train, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
 final_predictions <- predict(final_model, newdata=test)
 final_mse <- mean((test$log_price - final_predictions)^2)
@@ -118,7 +118,7 @@ for(i in 1:k){
   test_indices <- which(folds==i, arr.ind=TRUE)
   test_data <- train[test_indices, ]
   train_data <- train[-test_indices, ]
-  set.seed(123)
+  set.seed(1)
   model <- randomForest(log_price ~ ., data=train_data, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
   
   # Make predictions
