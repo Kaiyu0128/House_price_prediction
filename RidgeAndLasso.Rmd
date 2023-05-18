@@ -63,6 +63,12 @@ lasso.coef[lasso.coef!=0]
 
 The best lambda found with 10-fold cross-validation is 6.74e-04. After performing the lasso with the best lambda, we find that the coefficient of renovated was shrunk to zero. 
 
+```{r}
+# bestlam = 0.0006743064
+lasso.best = glmnet(x,y,alpha=1,lambda=bestlam)
+coef(lasso.best)
+```
+
 ### Cross-validation metrics: Lasso
 ```{r}
 library(caret)
@@ -103,6 +109,12 @@ set.seed(1)
 out=glmnet(x,y,alpha=0,lambda=grid)
 ridge.coef=predict(out,type="coefficients",s=bestlam)[1:9,]
 ridge.coef
+```
+
+```{r}
+# bestlam = 0.0343501
+ridge.best = glmnet(x,y,alpha=0,lambda=bestlam)
+coef(ridge.best)
 ```
 
 ### Cross-validation metrics: Ridge

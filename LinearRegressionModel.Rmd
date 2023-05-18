@@ -7,13 +7,14 @@ date: "2023-05-18"
 ---
 
 ### Introduction
-In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1561 after data cleaning). The response variable is log(price). 
+In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1560 after data cleaning). The response variable is log(price). 
 
 ### Summary of the data set
 ```{r}
 data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',
                  stringsAsFactors = TRUE)
 str(data)
+dim(data)
 summary(data)
 
 # Response variable: price
@@ -40,6 +41,7 @@ names(data2)[names(data2) == "yr_renovated"] <- "renovated"
 data2$waterfront <- as.factor(data2$waterfront)
 data2$renovated <- as.factor(data2$renovated)
 
+dim(data2)
 summary(data2)
 ```
 
@@ -91,6 +93,7 @@ plot(density(log(seattle.df$price)))
 From the numerical summary: the minimum house price in Seattle is 90,000, the median is 490,000, the mean is 576401, and the maximum is 3,200,000. Price is heavily skewed right.
 
 ```{r}
+par(mfrow = c(2, 2))
 hist(seattle.df$bedrooms)
 hist(seattle.df$bathrooms)
 hist(seattle.df$sqft_living)
@@ -125,10 +128,6 @@ par(mfrow = c(1, 1))
 hist(seattle.df$price[which(seattle.df$renovated == 1)])
 hist(seattle.df$price[which(seattle.df$renovated == 0)])
 ```
-```{r}
-summary(seattle.df)
-str(seattle.df)
-```
 
 Price appears positively correlated with all predictors except yr_built. The distributions of price with renovated = 1 and renovated = 0 seem to be the same.
 
@@ -150,17 +149,10 @@ test.df = data.frame(seattle.df[test,])
 ```
 
 
-#### Full fit of the model
+#### Fit with all predictors
 ```{r}
 seattle_full.lm = lm(log(price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lm)
-
-# Test MSE 
-lm_full.pred = predict(seattle_full.lm, test.df, type=c("response"))
-err.lm_full = mean((lm_full.pred-log(test.df$price))^2)
-err.lm_full
-rmse.lm.full = sqrt(err.lm_full)
-rmse.lm.full
 ```
 
 The full model has an R2 = 0.5746. After fitting the linear regression model, we find that the variable renovated is not significant.
@@ -183,7 +175,7 @@ rmse.lm
 
 
 ##### Model Adequacy Checking
-Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal.
+Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal (homoscedasticity).
 
 ```{r}
 # Checking multicollinearity
@@ -196,16 +188,26 @@ Since every coefficient is less than 0.75, we will assume there is little multic
 ```{r}
 ```
 
-Since sqft_lot was skewed in our exploratory data analysis, we will apply a log-transform to sqft_lot in the next model. 
-
 Now we check the residuals.
 
 ```{r}
 # Checking residuals
+par(mfrow = c(2, 2))
 plot(seattle.lm2)
 ```
 
-Now we conduct a likelihood ratio test to compare nested models.
+The residuals vs fitted plots and the scale-location plot shows lines that are mostly straight, so we can assume variances in the residuals are equal. 
+
+```{r}
+# Check for normality of residuals
+# Shapiro-Wilk normality test
+lm.pred = predict(seattle.lm2, test.df, type=c("response"))
+hist(lm.pred)
+set.seed(1)
+shapiro.test(lm.pred)
+```
+
+The p-value is small, so we reject H0 and conclude that the residuals are not normally distributed. It appears homoscedasticity is satisfied, but normality of residuals is not. We note that one of the linear model assumptions is violated. Now we conduct a likelihood ratio test to compare nested models.
 
 ```{r}
 # Likelihood ratio test
@@ -218,7 +220,6 @@ Now we select a model using backward subset selection.
 
 #### 2. Backward subset selection
 ```{r}
-# Backward subset selection
 library(MASS)
 stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 ```
