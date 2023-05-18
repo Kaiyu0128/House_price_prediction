@@ -224,11 +224,14 @@ library(MASS)
 stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 ```
 
-Backward subset selection removes one predictors renovated. Thus the number of predictors is the same as if we had removed based on p-value. Now we will log-transform the necessary predictor, and use this model as our linear regression model for prediction.
+Backward subset selection removes one predictors renovated. Thus the number of predictors is the same as if we had removed based on p-value. Now we will log-transform the necessary predictors, and use this model as our linear regression model for prediction.
 
 ### Final linear regression model
 ```{r}
-summary(seattle.lm2)
+# Log-transform right-skewed variables: sqft_living and sqft_lot 
+# Possible exponential relationship
+seattle.lm3 = update(seattle_full.lm, ~ . -renovated - sqft_living + I(log(sqft_living)) -sqft_lot + I(log(sqft_lot)) )
+summary(seattle.lm3)
 
 # Test MSE 
 lm.pred = predict(seattle.lm2, test.df, type=c("response"))
@@ -255,7 +258,7 @@ set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(log(price) ~ bedrooms + bathrooms + sqft_living + floors + 
+model <- train(log(price) ~ bedrooms + bathrooms + I(log(sqft_living)) + floors + 
     condition + yr_built + I(log(sqft_lot)), data = seattle.df, method = "lm", trControl = ctrl)
 
 #view summary of k-fold CV               

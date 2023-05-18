@@ -175,21 +175,36 @@ summary(fit_log.poly3)
 anova(fit_log.poly3, fit_log.poly, test= "LRT")
 ```
 
-We observe a p-value = 0.164, so we fail to reject H0 and can safely assume the simpler model is the same as the complex one. 
+We observe a p-value = 0.164, so we fail to reject H0 and can safely assume the simpler model 3 is the same as the complex one. 
+
+```{r}
+# Log(sqft_lot)
+fit_log.poly4 = lm(formula = log(price) ~ bedrooms + bathrooms + poly(sqft_living, 
+    2) + I(log(sqft_lot)) + floors + condition + yr_built, data = data_train)
+summary(fit_log.poly4) 
+```
+
+```{r}
+# Compare AIC
+AIC(fit_log.poly3)
+AIC(fit_log.poly4)
+```
+
+
 
 ```{r}
 # Likelihood ratio test comparing linear model and polynomial model
-anova(lm(formula = log(price) ~ bedrooms + bathrooms + sqft_living + sqft_lot + 
+anova(lm(formula = log(price) ~ bedrooms + bathrooms + I(log(sqft_living)) + I(log(sqft_lot)) + 
     floors + condition + yr_built, 
-    data = data_train),fit_log.poly3, test= "LRT")
+    data = data_train),fit_log.poly4, test= "LRT")
 ```
 
 We observe a p-value near 0, so we reject H0 and conclude that the polynomial model and the linear model are not the same. 
 
 ```{r}
 # Model Diagnostic Checking
-lm.pred = predict(fit_log.poly3, data_test, type=c("response"))
-plot(fit_log.poly3)
+lm.pred = predict(fit_log.poly4, data_test, type=c("response"))
+plot(fit_log.poly4)
 hist(lm.pred)
 set.seed(1)
 shapiro.test(lm.pred)
@@ -206,7 +221,7 @@ set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(log(price) ~ bedrooms + bathrooms + poly(sqft_living, 2) + sqft_lot + 
+model <- train(log(price) ~ bedrooms + bathrooms + poly(sqft_living, 2) + I(log(sqft_lot)) + 
     floors + condition + yr_built, data = data, method = "lm", trControl = ctrl)
 
 #view summary of k-fold CV               
