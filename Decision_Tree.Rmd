@@ -9,7 +9,7 @@ In this file, we will use a random forest model to predict housing prices in Sea
 ###importing a dataset
 ```{r}
 #importing dataset
-data <- read.csv('~/Desktop/House_Price_Prediction/Seattle.csv')
+data <- read.csv('~/Desktop/House_Price_Prediction/Seattle_with_renovated.csv')
 summary(data)
 str(data)
 ```
@@ -42,7 +42,10 @@ test$yr_renovated <- NULL
 # Log-transform the target variable
 train$log_price <- log(train$price)
 test$log_price <- log(test$price)
-
+head(train$log_price)
+head(train$price)
+train <- subset(train, select = -price)
+test <- subset(test, select = -price)
 # Set hyperparameters
 mtry <- sqrt(ncol(train) - 1)   # mtry is typically square root of the number of features
 ntree <- 500                     # number of trees, can adjust as needed
@@ -57,10 +60,7 @@ print(tree)
 
 tree_predictions <- predict(tree, newdata=test)
 
-# Convert predictions back to original scale
-tree_predictions <- exp(tree_predictions)
-
-tree_mse <- mean((test$price - tree_predictions)^2)
+tree_mse <- mean((test$log_price - tree_predictions)^2)
 print(paste("Random Forest MSE: ", tree_mse))
 ```
 
@@ -78,8 +78,7 @@ for (mtry in mtry_values) {
     set.seed(123)
     model <- randomForest(log_price ~ ., data=train, mtry=mtry, ntree=ntree, importance=TRUE)
     predictions <- predict(model, newdata=test)
-    predictions <- exp(predictions)  # Convert predictions back to original scale
-    mse <- mean((test$price - predictions)^2)
+    mse <- mean((test$log_price - predictions)^2)
     if (mse < best_mse) {
       best_mse <- mse
       best_mtry <- mtry
@@ -96,22 +95,12 @@ print(paste("Best ntree: ", best_ntree))
 
 ###use the best model from above.
 ```{r}
-# Set the seed for reproducibility
 set.seed(123)
-
-# Train the final model using the best hyperparameters
 final_model <- randomForest(log_price ~ ., data=train, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
-
-# Use the final model to make predictions on the test set
 final_predictions <- predict(final_model, newdata=test)
-
-# Convert predictions back to the original scale
-final_predictions <- exp(final_predictions)
-
-# Compute the MSE of the final model
-final_mse <- mean((test$price - final_predictions)^2)
-
-print(paste("Final Model MSE: ", final_mse))
+final_mse <- mean((test$log_price - final_predictions)^2)
+final_rmse <- sqrt(final_mse)
+print(paste("Final RMSE: ", final_rmse))
 ```
 
 
@@ -124,31 +113,22 @@ k <- 5
 # Create k equally size folds
 folds <- cut(seq(1, nrow(train)), breaks=k, labels=FALSE)
 
-# For storing results
 mse_values <- vector("numeric", k)
-
-# Perform k-fold cross validation
 for(i in 1:k){
-  
-  # Segement your data by fold using the which() function 
   test_indices <- which(folds==i, arr.ind=TRUE)
   test_data <- train[test_indices, ]
   train_data <- train[-test_indices, ]
-  
-  # Fit random forest model
   set.seed(123)
   model <- randomForest(log_price ~ ., data=train_data, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
   
   # Make predictions
   predictions <- predict(model, newdata=test_data)
-  predictions <- exp(predictions)  # Convert predictions back to original scale
   
   # Compute MSE
-  mse_values[i] <- mean((test_data$price - predictions)^2)
+  mse_values[i] <- mean((test$log_price - predictions)^2)
   
 }
 
-# The average MSE of all k folds
 average_mse <- mean(mse_values)
 
 print(paste("Average MSE from 5-fold CV: ", average_mse))
@@ -161,20 +141,14 @@ considering price range is relatively big, this model can be said pretty robust.
 # Final model predictions
 final_model <- randomForest(log_price ~ ., data=train, mtry=best_mtry, ntree=best_ntree, importance=TRUE)
 final_predictions <- predict(final_model, newdata=test)
-final_predictions <- exp(final_predictions)  # Convert predictions back to original scale
 summary(final_model)
-# Plot true values vs predicted values
-plot(test$price, final_predictions, main="True vs Predicted Values", xlab="True Values", ylab="Predicted Values")
-abline(0, 1, col="red")  # adds a 45-degree line
-
-# Plot residuals vs fitted values
-residuals <- test$price - final_predictions
+plot(test$log_price, final_predictions, main="True vs Predicted Values", xlab="True Values", ylab="Predicted Values")
+abline(0, 1, col="red")
+residuals <- test$log_price - final_predictions
 plot(final_predictions, residuals, main="Residuals vs Fitted Values", xlab="Fitted Values", ylab="Residuals")
-abline(h=0, col="red")  # adds a horizontal line at 0
-
+abline(h=0, col="red") 
 ```
 ```{r}
-# Check variable importance
 importance(final_model)
 varImpPlot(final_model)
 ```

@@ -126,6 +126,10 @@ par(mfrow = c(1, 1))
 hist(seattle.df$price[which(seattle.df$renovated == 1)])
 hist(seattle.df$price[which(seattle.df$renovated == 0)])
 ```
+```{r}
+summary(seattle.df)
+str(seattle.df)
+```
 
 There appears to be no linear relationship between price and sqft_lot, price and yr_built, and price and yr_renovated. Price is positively correlated with all other predictors. 
 
