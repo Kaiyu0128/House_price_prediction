@@ -7,7 +7,7 @@ date: "2023-05-18"
 ---
 
 ### Introduction
-In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1461 after data cleaning). The response variable is price. 
+In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1561 after data cleaning). The response variable is log(price). 
 
 ### Summary of the data set
 ```{r}
@@ -43,22 +43,17 @@ data2$renovated <- as.factor(data2$renovated)
 summary(data2)
 ```
 
-We note that waterfront is unbalanced, with a much greater proportion of 0s than 1s. Now we clean the response variable: price.
+We note that waterfront is unbalanced, with a much greater proportion of 0s than 1s. Now we clean the response variable: price. Immediately there is a low outlier of 7800 to remove.
 
 ```{r}
-data2 <- subset(data2, price != 7800) #Low outlier found
-boxplot(data2$price) #with outliers
-#identify and remove outliers. R does this using the 1.5*IQR criterion
-outliers <- boxplot(data2$price, plot=FALSE)$out
-data2 <- data2[-which(data2$price %in% outliers),]
+# Low outlier and two high outliers identified manually
+data2 <- subset(data2, price != 7800 & price != 26590000 & price != 12899000) 
+boxplot(data2$price)
+summary(data2$price)
 ```
-```{r}
-hist(data2$price)
-plot(density(data2$price))
-plot(density(log(data2$price)))
-```
+To recap, 50 low outliers which we believe are bad data have been removed. Two high outliers have been removed.
 
-Essentially, the top 15% of Washing house prices have been removed by using the 1.5*IQR criterion, and we remove one low outlier manually. Now that the Washington data is clean, we are ready to analyze the Seattle data.
+Now that the Washington data is clean, we are ready to analyze the Seattle data.
 
 ### Exploratory Data Analysis
 
@@ -79,17 +74,24 @@ There is only one waterfront = 1 entry, so we will remove the waterfront variabl
 seattle.df = subset(seattle.df, select = -c(waterfront))
 ```
 
-Now we have 8 numerical predictors and 1 categorical predictor. The Seattle data frame consists of 1461 houses with 9 variables. 
+Now we have 8 numerical predictors and 1 categorical predictor. The Seattle data frame consists of 1561 houses with 9 predictors. 
 
 ```{r}
-# Price
+# Price and log(price)
 boxplot(seattle.df$price)
 summary(seattle.df$price)
 hist(seattle.df$price)
 plot(density(seattle.df$price))
+
+boxplot(log(seattle.df$price))
+summary(log(seattle.df$price))
+hist(log(seattle.df$price))
 plot(density(log(seattle.df$price)))
+
+# Check normality of log(price) 
+shapiro.test(log(seattle.df$price))
 ```
-From the summary: the minimum house price in Seattle is 90,000, the median is 475,000, the mean is 509351, and the maximum is 1,145,000. We notice that price is bell-shaped but is skewed right, so we will check the fit for log(price) along with price.
+From the summary: the minimum house price in Seattle is 90,000, the median is 490,000, the mean is 584295, and the maximum is 12,899,000. Price is heavily skewed right.
 
 ```{r}
 hist(seattle.df$bedrooms)
@@ -127,7 +129,7 @@ hist(seattle.df$price[which(seattle.df$renovated == 1)])
 hist(seattle.df$price[which(seattle.df$renovated == 0)])
 ```
 
-There appears to be no linear relationship between price and sqft_lot, price and yr_built, and price and yr_renovated. Price is positively correlated with all other predictors. 
+Price appears positively correlated with all predictors except yr_built. 
 
 ### Creating the model
 
