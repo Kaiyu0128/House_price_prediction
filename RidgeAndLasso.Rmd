@@ -22,18 +22,18 @@ set.seed(1)
 # Training and test sets
 train = sample(1:nrow(seattle.df), nrow(seattle.df)*0.8) # 80/20 split
 test = (-train)
-price.test = seattle.df$price[test]
+y.test = log(seattle.df$price[test])
 
 # Dataframes
 train.df = data.frame(seattle.df[train,])
 test.df = data.frame(seattle.df[test,])
 ```
 
-#### 4. The Lasso
+#### The Lasso
 ```{r}
 library(glmnet)
-x = model.matrix(price ~ . -sqft_lot + I((sqft_lot)), data = seattle.df)[,-1]
-y = seattle.df$price
+x = model.matrix(log(price) ~ ., data = seattle.df)[,-1]
+y = log(seattle.df$price)
 ```
 
 We use cross-validation to find the best tuning parameter lambda, then perform the lasso. Coefficients that are shrunk to zero will be effectively removed from the final model.
@@ -51,22 +51,17 @@ plot(cv.out)#CV error plot
 bestlam=cv.out$lambda.min #cv.out$lambda.1se
 bestlam
 lasso.pred=predict(lasso.mod,s=bestlam,newx=x[test,])
-mean((lasso.pred-price.test)^2) #compare to OLS error
-sqrt(mean((lasso.pred-price.test)^2))
+mean((lasso.pred-y.test)^2)#compare to OLS error
+sqrt(mean((lasso.pred-y.test)^2))
 #refit on the full data set, using the "best" lambda
+set.seed(1)
 out=glmnet(x,y,alpha=1,lambda=grid)
 lasso.coef=predict(out,type="coefficients",s=bestlam)[1:9,]
 lasso.coef
 lasso.coef[lasso.coef!=0]
 ```
 
-The best lambda found with 10-fold cross-validation is 248. After performing the lasso with the best lambda, we find that none of the coefficients of the predictors were shrunk to zero. The root mean squared error is 146395.3, which is slightly higher than the error from OLS (144985). 
-
-```{r}
-# Best model
-lasso.best = glmnet(x, y, alpha = 1, lambda = bestlam)
-coef(lasso.best)
-```
+The best lambda found with 10-fold cross-validation is 6.74e-04. After performing the lasso with the best lambda, we find that the coefficient of renovated was shrunk to zero. 
 
 ### Cross-validation metrics: Lasso
 ```{r}
@@ -74,17 +69,18 @@ library(caret)
 
 #specify the cross-validation method
 # k-fold CV; k=10
+set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(price ~ . -sqft_lot + I((sqft_lot)), data = seattle.df, method = "lasso", trControl = ctrl)
+model <- train(log(price) ~ ., data = seattle.df, method = "lasso", trControl = ctrl)
 
 #view summary of k-fold CV               
 print(model)
 ```
 
 ### Conclusion: Lasso
-The lasso cross-validated RMSE = 145429.0, R2 = 0.4839, and MAE = 110890.1. The lasso performs slightly worse than least squares (RMSE = 144985). Furthermore, the least squares model is simpler with one less predictor.
+The lasso cross-validated RMSE = 0.3253822, R2 = 0.5657846, and MAE = 0.2465214. The lasso performs slightly worse than least squares (RMSE = 0.3244248). Furthermore, the least squares model is simpler with one less predictor.
 
 ### Ridge Regression
 ```{r}
@@ -93,34 +89,35 @@ The lasso cross-validated RMSE = 145429.0, R2 = 0.4839, and MAE = 110890.1. The 
 #######################
 grid=10^seq(10,-2,length=100)
 ridge.mod=glmnet(x[train,],y[train],alpha=0,lambda=grid)
-plot(lasso.mod)#coefficient plot
+plot(ridge.mod)#coefficient plot
 set.seed(1)
 cv.out=cv.glmnet(x[train,],y[train],alpha=0)
 plot(cv.out)#CV error plot
 bestlam=cv.out$lambda.min #cv.out$lambda.1se
 bestlam
 ridge.pred=predict(ridge.mod,s=bestlam,newx=x[test,])
-mean((ridge.pred-price.test)^2) #compare to OLS error
-sqrt(mean((ridge.pred-price.test)^2))
+mean((ridge.pred-y.test)^2) #compare to OLS error
+sqrt(mean((ridge.pred-y.test)^2))
 #refit on the full data set, using the "best" lambda
+set.seed(1)
 out=glmnet(x,y,alpha=0,lambda=grid)
 ridge.coef=predict(out,type="coefficients",s=bestlam)[1:9,]
 ridge.coef
-ridge.coef[ridge.coef!=0]
 ```
 
 ### Cross-validation metrics: Ridge
 ```{r}
 #specify the cross-validation method
 # k-fold CV; k=10
+set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(price ~ . -sqft_lot + I((sqft_lot)), data = seattle.df, method = "ridge", trControl = ctrl)
+model <- train(log(price) ~ ., data = seattle.df, method = "ridge", trControl = ctrl)
 
 #view summary of k-fold CV               
 print(model)
 ```
 
 ### Conclusion: Ridge
-The ridge regression cross-validated RMSE = 144896.8, R2 = 0.4951, and MAE = 110158.7. The ridge performs better than least squares (RMSE = 144985). Ridge > OLS > Lasso in terms of reducing RMSE.
+The ridge regression cross-validated RMSE = 0.3266729, R2 = 0.5617233, and MAE = 0.2490763. OLS > Lasso > Ridge in terms of reducing RMSE and increasing R2.
