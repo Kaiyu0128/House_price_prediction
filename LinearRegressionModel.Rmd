@@ -7,13 +7,14 @@ date: "2023-05-18"
 ---
 
 ### Introduction
-In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1561 after data cleaning). The response variable is log(price). 
+In this file, we will use a multiple linear regression model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle (1560 after data cleaning). The response variable is log(price). 
 
 ### Summary of the data set
 ```{r}
 data <- read.csv('~/Desktop/House_Price_Prediction/data.csv',
                  stringsAsFactors = TRUE)
 str(data)
+dim(data)
 summary(data)
 
 # Response variable: price
@@ -40,6 +41,7 @@ names(data2)[names(data2) == "yr_renovated"] <- "renovated"
 data2$waterfront <- as.factor(data2$waterfront)
 data2$renovated <- as.factor(data2$renovated)
 
+dim(data2)
 summary(data2)
 ```
 
@@ -128,10 +130,6 @@ par(mfrow = c(1, 1))
 hist(seattle.df$price[which(seattle.df$renovated == 1)])
 hist(seattle.df$price[which(seattle.df$renovated == 0)])
 ```
-```{r}
-summary(seattle.df)
-str(seattle.df)
-```
 
 Price appears positively correlated with all predictors except yr_built. The distributions of price with renovated = 1 and renovated = 0 seem to be the same.
 
@@ -153,17 +151,10 @@ test.df = data.frame(seattle.df[test,])
 ```
 
 
-#### Full fit of the model
+#### Fit with all predictors
 ```{r}
 seattle_full.lm = lm(log(price) ~ ., data=seattle.df, subset=train)
 summary(seattle_full.lm)
-
-# Test MSE 
-lm_full.pred = predict(seattle_full.lm, test.df, type=c("response"))
-err.lm_full = mean((lm_full.pred-log(test.df$price))^2)
-err.lm_full
-rmse.lm.full = sqrt(err.lm_full)
-rmse.lm.full
 ```
 
 The full model has an R2 = 0.5746. After fitting the linear regression model, we find that the variable renovated is not significant.
@@ -186,7 +177,7 @@ rmse.lm
 
 
 ##### Model Adequacy Checking
-Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal.
+Assumptions for linear regression: 1) little to no multicollinearity, 2) linear relationship between predictors and response, 3) normally-distributed variables, and 4) variances are equal (homoscedasticity).
 
 ```{r}
 # Checking multicollinearity
@@ -199,16 +190,26 @@ Since every coefficient is less than 0.75, we will assume there is little multic
 ```{r}
 ```
 
-Since sqft_lot was skewed in our exploratory data analysis, we will apply a log-transform to sqft_lot in the next model. 
-
 Now we check the residuals.
 
 ```{r}
 # Checking residuals
+par(mfrow = c(2, 2))
 plot(seattle.lm2)
 ```
 
-Now we conduct a likelihood ratio test to compare nested models.
+The residuals vs fitted plots and the scale-location plot shows lines that are mostly straight, so we can assume variances in the residuals are equal. 
+
+```{r}
+# Check for normality of residuals
+# Shapiro-Wilk normality test
+lm.pred = predict(seattle.lm2, test.df, type=c("response"))
+hist(lm.pred)
+set.seed(1)
+shapiro.test(lm.pred)
+```
+
+The p-value is small, so we reject H0 and conclude that the residuals are not normally distributed. It appears homoscedasticity is satisfied, but normality of residuals is not. We note that one of the linear model assumptions is violated. Now we conduct a likelihood ratio test to compare nested models.
 
 ```{r}
 # Likelihood ratio test
@@ -221,16 +222,18 @@ Now we select a model using backward subset selection.
 
 #### 2. Backward subset selection
 ```{r}
-# Backward subset selection
 library(MASS)
 stepAIC(seattle_full.lm) # stepwise backward selection using AIC
 ```
 
-Backward subset selection removes one predictors renovated. Thus the number of predictors is the same as if we had removed based on p-value. Now we will log-transform the necessary predictor, and use this model as our linear regression model for prediction.
+Backward subset selection removes one predictors renovated. Thus the number of predictors is the same as if we had removed based on p-value. Now we will log-transform the necessary predictors, and use this model as our linear regression model for prediction.
 
 ### Final linear regression model
 ```{r}
-summary(seattle.lm2)
+# Log-transform right-skewed variables: sqft_living and sqft_lot 
+# Possible exponential relationship
+seattle.lm3 = update(seattle_full.lm, ~ . -renovated - sqft_living + I(log(sqft_living)) -sqft_lot + I(log(sqft_lot)) )
+summary(seattle.lm3)
 
 # Test MSE 
 lm.pred = predict(seattle.lm2, test.df, type=c("response"))
@@ -257,7 +260,7 @@ set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(log(price) ~ bedrooms + bathrooms + sqft_living + floors + 
+model <- train(log(price) ~ bedrooms + bathrooms + I(log(sqft_living)) + floors + 
     condition + yr_built + I(log(sqft_lot)), data = seattle.df, method = "lm", trControl = ctrl)
 
 #view summary of k-fold CV               

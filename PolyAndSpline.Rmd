@@ -1,0 +1,430 @@
+---
+title: "Housing Price Prediction 3: Polynomial Regression and Splines"
+author: "kaiyu and William"
+date: "2023-05-18"
+output: html_document
+---
+
+### Introduction
+In this file, we will use a spline model to predict housing prices in Seattle, Washington in 2014. The data we will use is from Kaggle, uploaded by SHREE. Considering the data provided, we are wrangling a large set of property sales records stored in an unknown format and with unknown data quality issues. Additionally, we will model the data using random forest and cubic spline. The full dataset contains 4600 houses throughout the state of Washington with 18 variables, 1573 of the houses belonging to Seattle. The response variable is price. 
+
+```{r}
+#data <- read.csv('/Users/kaiyuyokoi/Desktop/House_price_prediction/Seattle.csv')
+data <- read.csv('/Users/linw/Desktop/House_price_prediction/Seattle.csv')
+data$renovated = as.factor(data$renovated)
+summary(data)
+str(data)
+```
+
+```{r}
+# Training and test sets
+
+# Set a seed for reproducibility
+set.seed(1)
+
+# Determine the number of rows in the dataset
+n <- nrow(data)
+
+# Determine the number of rows for the training set (e.g., 80% of the data)
+n_train <- round(0.80 * n)
+
+# Randomly select rows for the training set
+train_indices <- sample(1:n, n_train)
+
+# Create the training set
+data_train <- data[train_indices, ]
+
+# Create the test set
+data_test <- data[-train_indices, ]
+```
+
+### Selecting optimal degrees for polynomial regression
+
+(All variables will be analyzed. The CV plots of variables and the code used to generate them that have an optimal degree polynomial of 1 won't be mentioned in this report.)
+
+```{r}
+# k-fold cross-validation 
+# to select optimal degree d for the polynomial
+# variable: floors
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(floors,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+Degree 2 polynomial is optimal for the floors variable.
+
+```{r}
+# Plot of resulting polynomial fit to the data
+
+xlims=range(data$floors)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~poly(floors,2), data=data),newdata=list(floors=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$floors,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+Interestingly, price seems to increase with floors up to 2 floors, then decreases after 2 floors.
+
+```{r}
+# CV for optimal degree
+# variable: sqft_living
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(sqft_living,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+Degree 2 polynomial is optimal for the sqft_living variable.
+
+```{r}
+# Plot of resulting polynomial fit to the data
+
+xlims=range(data$sqft_living)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(log(price)~poly(sqft_living,2), data=data),newdata=list(sqft_living=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$sqft_living,log(data$price),xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+```{r}
+# CV for optimal d
+# variable: yr_built
+library(boot)
+set.seed(1)
+cv.error.10=rep(0,4)
+for (i in 1:4){
+  glm.fit=glm(price~poly(yr_built,i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+The CV error is lowest where degree = 4. However, degree 2 seems to be a good choice, so we will use degree 2 for the variable yr_built.
+
+```{r}
+# Plot of resulting polynomial fit to the data
+
+xlims=range(data$yr_built)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~poly(yr_built,2),data=data),newdata=list(yr_built=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$yr_built,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+### Polynomial regression
+
+```{r}
+fit_log.poly = lm(log(price) ~ bedrooms + bathrooms + poly(sqft_living,2) + sqft_lot + poly(floors,2) + condition + poly(yr_built, 2) + renovated, data = data_train)
+summary(fit_log.poly)
+```
+
+```{r}
+library(MASS)
+stepAIC(fit_log.poly)
+```
+
+```{r}
+fit_log.poly2 = lm(formula = log(price) ~ bedrooms + bathrooms + poly(sqft_living, 
+    2) + sqft_lot + poly(floors, 2) + condition + poly(yr_built, 
+    2) + renovated, data = data_train)
+summary(fit_log.poly2)
+```
+
+```{r}
+# Remove insignificant predictors
+fit_log.poly3 = lm(formula = log(price) ~ bedrooms + bathrooms + poly(sqft_living, 
+    2) + sqft_lot + floors + condition + yr_built, data = data_train)
+summary(fit_log.poly3)
+```
+
+```{r}
+# Likelihood ratio test
+anova(fit_log.poly3, fit_log.poly, test= "LRT")
+```
+
+We observe a p-value = 0.164, so we fail to reject H0 and can safely assume the simpler model 3 is the same as the complex one. 
+
+```{r}
+# Log(sqft_lot)
+fit_log.poly4 = lm(formula = log(price) ~ bedrooms + bathrooms + poly(sqft_living, 
+    2) + I(log(sqft_lot)) + floors + condition + yr_built, data = data_train)
+summary(fit_log.poly4) 
+```
+
+```{r}
+# Compare AIC
+AIC(fit_log.poly3)
+AIC(fit_log.poly4)
+```
+
+
+
+```{r}
+# Likelihood ratio test comparing linear model and polynomial model
+anova(lm(formula = log(price) ~ bedrooms + bathrooms + I(log(sqft_living)) + I(log(sqft_lot)) + 
+    floors + condition + yr_built, 
+    data = data_train),fit_log.poly4, test= "LRT")
+```
+
+We observe a p-value near 0, so we reject H0 and conclude that the polynomial model and the linear model are not the same. 
+
+```{r}
+# Model Diagnostic Checking
+lm.pred = predict(fit_log.poly4, data_test, type=c("response"))
+plot(fit_log.poly4)
+hist(lm.pred)
+set.seed(1)
+shapiro.test(lm.pred)
+```
+It appears homoscedasticity is satisfied, but normality of residuals is not.
+
+# Cross-validation metrics: Polynomial regression
+```{r}
+library(caret)
+
+#specify the cross-validation method
+# k-fold CV; k=10
+set.seed(1)
+ctrl <- trainControl(method = "cv", number = 10)
+
+#fit a regression model and use k-fold CV to evaluate performance
+model <- train(log(price) ~ bedrooms + bathrooms + poly(sqft_living, 2) + I(log(sqft_lot)) + 
+    floors + condition + yr_built, data = data, method = "lm", trControl = ctrl)
+
+#view summary of k-fold CV               
+print(model)
+```
+
+OLS cross-validated RMSE = 0.3244248, R2 = 0.5686078 , MAE = 0.2463774. Our polynomial regression model resulted in a CV RMSE = 0.3224453, R2 = 0.5735142, MAE = 0.2452352. Poly > OLS > Lasso > Ridge in terms of reducing RMSE and increasing R2.
+
+### Cubic Spline
+```{r}
+#############
+# Splines ###
+#############
+library(splines)            
+#bs() function generates the matrix of basis functions for splines
+#with the specified set of knots. By default, cubic splines are produced
+```
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: sqft_living
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(log(price)~bs(sqft_living,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+# Variable: sqft_living
+xlims=range(data$sqft_living)
+x.grid=seq(from=xlims[1],to=xlims[2])
+fit.spline=lm(log(price)~bs(sqft_living,df=4),data=data_train)
+pred=predict(fit.spline,newdata=list(sqft_living=x.grid),se=T)
+plot(data$sqft_living,log(data$price),xlim=xlims,cex=.5,col="darkgrey", main="Cubic Spline w/ df = 4")
+lines(x.grid,pred$fit,lwd=2)
+lines(x.grid,pred$fit+2*pred$se,lty="dashed")
+lines(x.grid,pred$fit-2*pred$se,lty="dashed")
+```
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: bathrooms
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(price~bs(bathrooms,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+# Variable: bathrooms
+xlims=range(data$sqft_lot)
+x.grid=seq(from=xlims[1],to=xlims[2])
+fit.spline=lm((price)~bs(sqft_lot,df=6),data=data_train)
+pred=predict(fit.spline,newdata=list(sqft_lot=x.grid),se=T)
+plot(data$sqft_lot,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,pred$fit,lwd=2)
+lines(x.grid,pred$fit+2*pred$se,lty="dashed")
+lines(x.grid,pred$fit-2*pred$se,lty="dashed")
+```
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: sqft_living
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(price~bs(sqft_living,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+# Variable: sqft_living
+xlims=range(data$sqft_living)
+x.grid=seq(from=xlims[1],to=xlims[2])
+fit.spline=lm((price)~bs(sqft_living,df=4),data=data_train)
+pred=predict(fit.spline,newdata=list(sqft_living=x.grid),se=T)
+plot(data$sqft_living,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,pred$fit,lwd=2)
+lines(x.grid,pred$fit+2*pred$se,lty="dashed")
+lines(x.grid,pred$fit-2*pred$se,lty="dashed")
+```
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: yr_built
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(price~bs(yr_built,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+# Variable: floors
+xlims=range(data$yr_built)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~bs(yr_built,df=6), data=data),newdata=list(yr_built=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$yr_built,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: condition
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(price~bs(condition,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+
+xlims=range(data$condition)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~bs(condition,df=4), data=data),newdata=list(condition=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$condition,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```
+
+```{r}
+# k-fold cross-validation 
+# to select optimal df for the cubic spline
+# variable: yr_built
+library(boot)
+set.seed(1)
+cv.error.10=rep(NA,6)
+for (i in 4:6){
+  glm.fit=glm(price~bs(yr_built,df=i), data=data)
+  cv.error.10[i]=cv.glm(data,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10, type = "b", xlab="Degree", ylab="CV Error")
+
+```
+
+```{r}
+# Plot of resulting spline fit to the data
+
+xlims=range(data$yr_built)
+#create a grid of values for x-variable at which we want predictions
+x.grid=seq(from=xlims[1],to=xlims[2])
+#se=T indicates that we want standard errors as well.
+preds=predict(glm(price~bs(yr_built,df=6), data=data),newdata=list(yr_built=x.grid),se=TRUE)
+se.bands=cbind(preds$fit+2*preds$se.fit,preds$fit-2*preds$se.fit)
+
+#plot the data and add polynomial fit.
+plot(data$yr_built,data$price,xlim=xlims,cex=.5,col="darkgrey")
+lines(x.grid,preds$fit,lwd=2,col="blue")
+title("Degree-2 Polynomial",outer=T)
+lines(x.grid,preds$fit,lwd=2,col="blue")
+matlines(x.grid,se.bands,lwd=1,col="blue",lty=3)
+```

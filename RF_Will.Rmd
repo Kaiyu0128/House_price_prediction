@@ -1,0 +1,59 @@
+---
+title: "House Price Prediction: Random Forest"
+output:
+  word_document: default
+  html_document: default
+date: "2023-05-18"
+---
+
+### Data set
+```{r}
+seattle.df <- read.csv("/Users/linw/Desktop/House_price_prediction/Seattle.csv",
+                 stringsAsFactors = TRUE)
+```
+
+```{r}
+library(ggplot2)
+set.seed(1)
+
+# Training and test sets
+train = sample(1:nrow(seattle.df), nrow(seattle.df)*0.8) # 80/20 split
+test = (-train)
+y.test = log(seattle.df$price[test])
+
+# Dataframes
+train.df = data.frame(seattle.df[train,])
+test.df = data.frame(seattle.df[test,])
+```
+
+### Bagging and Random Forests
+```{r}
+library(randomForest)
+set.seed(1)
+bag.seattle=randomForest(log(price)~.,data=seattle.df,subset=train,mtry=8,importance=TRUE)
+bag.seattle
+yhat.bag = predict(bag.seattle,newdata=seattle.df[-train,])
+plot(yhat.bag, y.test)
+abline(0,1)
+mean((yhat.bag-y.test)^2)
+sqrt(mean((yhat.bag-y.test)^2))
+```
+
+```{r}
+library(randomForest)
+set.seed(1)
+rf.seattle=randomForest(log(price)~.,data=seattle.df,subset=train,importance=TRUE)
+rf.seattle
+yhat.bag = predict(rf.seattle,newdata=seattle.df[-train,])
+plot(yhat.bag, y.test)
+abline(0,1)
+mean((yhat.bag-y.test)^2)
+sqrt(mean((yhat.bag-y.test)^2))
+```
+
+```{r}
+importance(rf.seattle)
+varImpPlot(rf.seattle)
+
+
+```

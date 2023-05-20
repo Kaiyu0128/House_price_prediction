@@ -32,7 +32,7 @@ test.df = data.frame(seattle.df[test,])
 #### The Lasso
 ```{r}
 library(glmnet)
-x = model.matrix(log(price) ~ ., data = seattle.df)[,-1]
+x = model.matrix(log(price) ~ . -sqft_living + I(log(sqft_living)) -sqft_lot + I(log(sqft_lot)), data = seattle.df)[,-1]
 y = log(seattle.df$price)
 ```
 
@@ -63,6 +63,12 @@ lasso.coef[lasso.coef!=0]
 
 The best lambda found with 10-fold cross-validation is 6.74e-04. After performing the lasso with the best lambda, we find that the coefficient of renovated was shrunk to zero. 
 
+```{r}
+# bestlam = 0.0006743064
+lasso.best = glmnet(x,y,alpha=1,lambda=bestlam)
+coef(lasso.best)
+```
+
 ### Cross-validation metrics: Lasso
 ```{r}
 library(caret)
@@ -73,7 +79,7 @@ set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(log(price) ~ ., data = seattle.df, method = "lasso", trControl = ctrl)
+model <- train(log(price) ~ . - sqft_living + I(log(sqft_living)) - sqft_lot + I(log(sqft_lot)), data = seattle.df, method = "lasso", trControl = ctrl)
 
 #view summary of k-fold CV               
 print(model)
@@ -105,6 +111,12 @@ ridge.coef=predict(out,type="coefficients",s=bestlam)[1:9,]
 ridge.coef
 ```
 
+```{r}
+# bestlam = 0.0343501
+ridge.best = glmnet(x,y,alpha=0,lambda=bestlam)
+coef(ridge.best)
+```
+
 ### Cross-validation metrics: Ridge
 ```{r}
 #specify the cross-validation method
@@ -113,7 +125,7 @@ set.seed(1)
 ctrl <- trainControl(method = "cv", number = 10)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model <- train(log(price) ~ ., data = seattle.df, method = "ridge", trControl = ctrl)
+model <- train(log(price) ~ . - sqft_living + I(log(sqft_living)) - sqft_lot + I(log(sqft_lot)), data = seattle.df, method = "ridge", trControl = ctrl)
 
 #view summary of k-fold CV               
 print(model)
