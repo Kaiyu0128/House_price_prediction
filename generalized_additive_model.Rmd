@@ -20,42 +20,36 @@ str(data)
 ```{r}
 # Set a seed for reproducibility
 set.seed(1)
-
-# Determine the number of rows in the dataset
 n <- nrow(data)
-
-# Determine the number of rows for the training set (e.g., 70% of the data)
-n_train <- round(0.70 * n)
-
-# Randomly select rows for the training set
+n_train <- round(0.80 * n)
 train_indices <- sample(1:n, n_train)
-
-# Create the training set
 data_train <- data[train_indices, ]
-
-# Create the test set
 data_test <- data[-train_indices, ]
+data_train$log_price <- log(data_train$price)
+data_test$log_price <- log(data_test$price)
+data_train <- subset(data_train, select = -price)
+data_test <- subset(data_test, select = -price)
+head(data_train)
 ```
 
 
 ###fit the model
 ```{r}
-gam_model1 <- gam(price ~ s(bedrooms, k=5) + s(bathrooms, k=5) + s(sqft_living, k=5) 
+library(mgcv)
+gam_model1 <- gam(log_price ~ s(bedrooms, k=5) + s(bathrooms, k=5) + s(sqft_living, k=5) 
                       + s(sqft_lot, k=5) + s(floors, k=5) + s(condition, k=5) 
-                      + s(yr_built, k=5) + s(yr_renovated, k=5), data = data_train)
-plot(gam_model, residuals = TRUE)
+                      + s(yr_built, k=5), data = data_train)
+plot(gam_model1, residuals = TRUE)
 predictions <- predict(gam_model1, newdata = data_test)
-plot(data_test$price, predictions, 
+plot(data_test$log_price, predictions, 
      xlab = "Actual values", 
      ylab = "Predicted values",
      main = "Actual vs Predicted values")
-# Add a line representing perfect predictions
 abline(a=0, b=1, col = "red")
-
 ```
 ###see correlation
 ```{r}
-plot(ggeffects::ggpredict(gam_model), facets = TRUE)
+plot(ggeffects::ggpredict(gam_model1), facets = TRUE)
 ```
 
 ```{r}
@@ -64,7 +58,7 @@ library(ggplot2)
 predictions <- predict(gam_model1, newdata = data_test)
 
 # Create a data frame for plotting
-plot_data <- data.frame(Actual = data_test$price, Predicted = predictions)
+plot_data <- data.frame(Actual = data_test$log_price, Predicted = predictions)
 
 # Plot actual vs predicted
 ggplot(plot_data, aes(x = Actual, y = Predicted)) +
@@ -75,35 +69,30 @@ ggplot(plot_data, aes(x = Actual, y = Predicted)) +
        y = "Predicted Prices")
 ```
 
-
-
 ###check r squared and mse
 ```{r}
 # Make predictions on the test data
 predictions <- predict(gam_model1, newdata = data_test)
 
 # Calculate the Root Mean Squared Error (RMSE)
-rmse <- sqrt(mean((data_test$price - predictions)^2))
+rmse <- sqrt(mean((data_test$log_price - predictions)^2))
 
 # Print the RMSE
 print(paste("Root Mean Squared Error: ", rmse))
 
 # Calculate R-squared
-SSE = sum((predictions - data_test$price)^2)
-SST = sum((mean(data_train$price) - data_test$price)^2)
+SSE = sum((predictions - data_test$log_price)^2)
+SST = sum((mean(data_train$log_price) - data_test$log_price)^2)
 R2 = 1 - SSE/SST
 
-# Print the R-squared
 print(paste("R-squared: ", R2))
 ```
-"Root Mean Squared Error:  130935.937301265"
-"R-squared:  0.569826520777548"
 
 
 ###visualize the fit of the model
 
 ```{r}
-plot(data_test$price, predictions, 
+plot(data_test$log_price, predictions, 
      xlab = "Actual values", 
      ylab = "Predicted values",
      main = "Actual vs Predicted values")

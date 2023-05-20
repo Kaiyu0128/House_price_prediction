@@ -90,7 +90,9 @@ plot(density(log(seattle.df$price)))
 ```
 From the numerical summary: the minimum house price in Seattle is 90,000, the median is 490,000, the mean is 576401, and the maximum is 3,200,000. Price is heavily skewed right.
 
+
 ```{r}
+par(mfrow = c(2, 2))
 hist(seattle.df$bedrooms)
 hist(seattle.df$bathrooms)
 hist(seattle.df$sqft_living)
@@ -100,6 +102,7 @@ hist(seattle.df$condition)
 hist(seattle.df$yr_built)
 plot(seattle.df$renovated, col = c("red","blue"), main = "Renovated", ylab = "Count")
 ```
+
 
 sqft_lot is extremely right skewed, so we will use a log-transformation on sqft_lot.
 

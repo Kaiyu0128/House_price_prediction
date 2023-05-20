@@ -47,8 +47,10 @@ head(train$price)
 train <- subset(train, select = -price)
 test <- subset(test, select = -price)
 # Set hyperparameters
-mtry <- sqrt(ncol(train) - 1)   # mtry is typically square root of the number of features
-ntree <- 500                     # number of trees, can adjust as needed
+mtry <- sqrt(ncol(train) - 1) # mtry is square root of the number of features
+mtry
+ntree <- 500 
+ntree
 ```
 
 
@@ -130,8 +132,11 @@ for(i in 1:k){
 }
 
 average_mse <- mean(mse_values)
+average_rmse <- sqrt(average_mse)
 
 print(paste("Average MSE from 5-fold CV: ", average_mse))
+print(paste("Average RMSE from 5-fold CV: ", average_rmse))
+
 ```
 
 considering price range is relatively big, this model can be said pretty robust. 
